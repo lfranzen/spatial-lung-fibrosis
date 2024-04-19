@@ -1,0 +1,32 @@
+﻿cell_name;cell_name_special;cell_group;lvl3_annotation
+AT1;AT1;Epithelium;AT1
+AT2;AT2;Epithelium;AT2
+B.Cells;B cells;Lymphoid;B cell
+Basal;Basal;Epithelium;Basal cell
+Ciliated;Ciliated;Epithelium;Ciliated cell
+Differentiating.Ciliated;Differentiating ciliated;Epithelium;Ciliated cell
+Endothelial.Cells;Endothelial cells;Endothelium;Endothelial cell
+Fibroblasts;Fibroblasts;Mesenchyme;Fibroblast
+HAS1.High.Fibroblasts;HAS1-high fibroblasts;Mesenchyme;Fibroblast
+KRT5_KRT17;KRT5-/KRT17+;Epithelium;KRT5-/KRT17+
+Lymphatic.Endothelial.Cells;LECs;Endothelium;Endothelial cell
+MUC5AC_High;MUC5AC-high;Epithelium;Epithelial cell
+MUC5B;MUC5B+;Epithelium;Epithelial cell
+Macrophages;Macrophages;Myeloid;Macrophage
+Mast.Cells;Mast cells;Myeloid;Mast cell
+Mesothelial.Cells;Mesothelial cells;Mesenchyme;Mesothelial cell
+Monocytes;Monocytes;Myeloid;Monocyte
+Myofibroblasts;Myofibroblasts;Mesenchyme;Myofibroblast
+NK.Cells;NK cells;Lymphoid;NK cell
+PLIN2_Fibroblasts;PLIN2+ fibroblasts;Mesenchyme;PLIN2+ fibroblasts
+Plasma.Cells;Plasma cells;Lymphoid;Plasma cell
+Proliferating.Epithelial.Cells;Proliferating epithelial cells;Epithelium;Epithelial cell
+Proliferating.Macrophages;Proliferating macrophages;Myeloid;Macrophage
+Proliferating.T.Cells;Proliferating T cells;Lymphoid;T cell
+SCGB3A2;SCGB3A2+;Epithelium;Epithelial cell
+SCGB3A2_SCGB1A1;SCGB3A2+SCGB1A1+;Epithelium;Epithelial cell
+Smooth.Muscle.Cells;SMCs;Mesenchyme;Smooth muscle cell
+T.Cells;T cells;Lymphoid;T cell
+Transitional.AT2;Transitional AT2;Epithelium;AT2
+cDCs;cDCs;Myeloid;Dendritic cell
+pDCs;pDCs;Myeloid;Dendritic cell

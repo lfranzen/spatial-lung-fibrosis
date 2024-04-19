@@ -1,0 +1,41 @@
+﻿c2l_col_name;cell_name;cell_name_special;cell_name_long;cell_group_broad;cell_group;cell_group_detailed;lung_compartment_healthy;lung_compartment_detailed;lvl3_annotation
+c2l_AM..Bleo.;AM_Bleo;AM (BLM);Alveloar macrophages (BLM);Immune;Myeloid;Macrophage;Alveolar;Parenchyma;Macrophage
+c2l_AM..PBS.;AM_PBS;AM (PBS);Alveloar macrophages (PBS);Immune;Myeloid;Macrophage;Alveolar;Parenchyma;Macrophage
+c2l_AT1.cells;AT1.cells;AT1 cells;Alveolar typ I cells;Epithelial;Epithelium;Alveolar epithelium;Alveolar;Parenchyma;AT1
+c2l_AT2.cells;AT2.cells;AT2 cells;Alveolar typ II cells;Epithelial;Epithelium;Alveolar epithelium;Alveolar;Parenchyma;AT2
+c2l_Activated.AT2.cells;Activated.AT2.cells;Activated AT2 cells;Activated alveolar typ II cells;Epithelial;Epithelium;Alveolar epithelium;Alveolar;Parenchyma;AT2
+c2l_Activated.mesothelial.cells;Activated.mesothelial.cells;Activated mesothelial cells;Activated mesothelial cells;Epithelial;Epithelium;Mesothelium;Bronchial;Parenchyma;Mesothelial cell
+c2l_B.lymphocytes;B.lymphocytes;B cells;B lymphocytes;Immune;Lymphoid;Lymphoid;Alveolar;Circulating;B cell
+c2l_CECs;CECs;Capillary;Capillary endothelial cells;Endothelial;Endothelium;Endothelium;Alveolar;Parenchyma;Endothelial cell
+c2l_Ccl17..DCs;Ccl17_DCs;Ccl17+ DCs;Ccl17+ dendritic cells;Immune;Myeloid;Myeloid;Alveolar;Circulating;Dendritic cell
+c2l_Cd103..DCs;Cd103_DCs;Cd103+ DCs;Cd103+ dendritic cells;Immune;Myeloid;Myeloid;Bronchial;Circulating;Dendritic cell
+c2l_Cd163..Cd11c..IMs;Cd163_Cd11c_IMs;Cd163+/Cd11c- IMs;Cd163+/Cd11c- interstital macrophages;Immune;Myeloid;Macrophage;Bronchial;Circulating;Macrophage
+c2l_Cd163..Cd11c..IMs.1;Cd163_Cd11c_IMs.1;Cd163-/Cd11c+ IMs;Cd163-/Cd11c+ interstital macrophages;Immune;Myeloid;Macrophage;Alveolar;Circulating;Macrophage
+c2l_Ciliated.cell.subset;Ciliated.cell.subset;Ciliated cell subset;Ciliated cell subset;Epithelial;Epithelium;Airway epithelium;Bronchial;Bronchial;Ciliated cell
+c2l_Ciliated.cells;Ciliated.cells;Ciliated cell;Ciliated cell;Epithelial;Epithelium;Airway epithelium;Bronchial;Bronchial;Ciliated cell
+c2l_Club.cells;Club.cells;Club cells;Club cells;Epithelial;Epithelium;Airway epithelium;Bronchial;Bronchial;Club cell
+c2l_DCs;DCs;DCs;Dendritic cells;Immune;Myeloid;Myeloid;Alveolar;Circulating;Dendritic cell
+c2l_Fibroblasts;Fibroblasts;Fibroblasts;Fibroblasts;Stroma;Mesenchyme;Mesenchyme;Mixed;Stroma;Fibroblast
+c2l_Fn1..macrophages;Fn1_macrophages;Fn1+ macrophages;Fn1+ macrophages;Immune;Myeloid;Macrophage;Alveolar;Circulating;Macrophage
+c2l_Goblet.cells;Goblet.cells;Goblet cells;Goblet cells;Epithelial;Epithelium;Airway epithelium;Bronchial;Bronchial;Goblet cell
+c2l_Krt8.ADI;Krt8.ADI;Krt8+ ADI;Krt8+ alveolar differentiation intermediate;Epithelial;Epithelium;Alveolar epithelium;Alveolar;Parenchyma;Krt8+ ADI
+c2l_LECs;LECs;LECs;Lymphatic endothelial cells;Endothelial;Endothelium;NA;Alveolar;Parenchyma;Endothelial cell
+c2l_Low.quality.cells;Low.quality.cells;Low quality cells;Low quality cells;NA;NA;NA;NA;NA;NA
+c2l_M2.macrophages;M2.macrophages;M2 macrophages;M2 macrophages;Immune;Myeloid;Macrophage;Mixed;Circulating;Macrophage
+c2l_Mesothelial.cells;Mesothelial.cells;Mesothelial cells;Mesothelial cells;Epithelial;Epithelium;Mesothelium;Alveolar;Parenchyma;Mesothelial cell
+c2l_Mki67..proliferating.cells;Mki67_proliferating.cells;Mki67+ proliferating cells;Mki67+ proliferating cells;NA;NA;NA;NA;NA;NA
+c2l_Mki67..Top2a..proliferating.cells;Mki67_Top2a_proliferating.cells;Mki67+/Top2a+ proliferating cells;Mki67+/Top2a+ proliferating cells;NA;NA;NA;NA;NA;NA
+c2l_Myofibroblasts;Myofibroblasts;Myofibroblasts;Myofibroblasts;Stroma;Mesenchyme;Mesenchyme;Bronchial;Stroma;Myofibroblast
+c2l_NA;NA;NA;NA;NA;NA;NA;NA;NA;NA
+c2l_NK.cells;NK.cells;NK cells;NK cells;Immune;Lymphoid;Lymphoid;Alveolar;Circulating;NK cell
+c2l_Neutrophils;Neutrophils;Neutrophils;Neutrophils;Immune;Myeloid;Myeloid;Alveolar;Circulating;Neutrophil
+c2l_Non.classical.monocytes..Ly6c2..;Non.classical.monocytes_Ly6c2_;Non classical monocytes (Ly6c2-);Non classical monocytes (Ly6c2-);Immune;Myeloid;Myeloid;Alveolar;Circulating;Monocyte
+c2l_Plasma.cells;Plasma.cells;Plasma cells;Plasma cells;Immune;Lymphoid;Lymphocyte;Alveolar;Circulating;Plasma cell
+c2l_Recruited.macrophages;Recruited.macrophages;Recruited macrophages;Recruited macrophages;Immune;Myeloid;Macrophage;Alveolar;Circulating;Macrophage
+c2l_Resolution.macrophages;Resolution.macrophages;Resolution macrophages;Resolution macrophages;Immune;Myeloid;Macrophage;Alveolar;Circulating;Macrophage
+c2l_SMCs;SMCs;SMCs;Smooth muscle cells;Stroma;Mesenchyme;Mesenchyme;Bronchial;Stroma;Smooth muscle cell
+c2l_T.cell.subset;T.cell.subset;T cell subset;T cell subset;Immune;Lymphoid;Lymphocyte;Bronchial;Circulating;T cell
+c2l_T.lymphocytes;T.lymphocytes;T cells;T lymphocytes;Immune;Lymphoid;Lymphocyte;Alveolar;Circulating;T cell
+c2l_Themis..T.lymphocytes;Themis_T.lymphocytes;Themis T cells;Themis T lymphocytes;Immune;Lymphoid;Lymphocyte;Alveolar;Circulating;T cell
+c2l_VECs;VECs;VECs;Vascular endothelial cells;Endothelial;Endothelium;Endothelium;Alveolar;Parenchyma;Endothelial cell
+c2l_Vcam1..VECs;Vcam1_VECs;Vcam1+ VECs;Vcam+ vascular endothelial cells;Endothelial;Endothelium;Endothelium;Alveolar;Parenchyma;Endothelial cell
