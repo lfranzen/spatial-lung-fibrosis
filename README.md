@@ -2,7 +2,7 @@
 
 Lovisa Franzén<sup>§</sup>, Martina Olsson Lindvall<sup>§</sup>, Michael Hühn, Victoria Ptasinski, Laura Setyo, Benjamin Keith, Astrid Collin, Steven Oag, Thomas Volckaert, Annika Borde, Joakim Lundeberg, Julia Lindgren, Graham Belfield, Sonya Jackson, Anna Ollerstam, Marianna Stamou<sup>$</sup>, Patrik L Ståhl<sup>$</sup>, Jorrit J Hornberg
 
-§ These authors contributed equally to the work
+§ These authors contributed equally to the work  
 $ Corresponding authors
 
 *bioRxiv* DOI:[https://doi.org/10.1101/2023.12.21.572330]
@@ -20,6 +20,6 @@ This repository contains the R code used to produce all the analyses and figures
 
 ## Contact
 
-For questions related to the Visium data and related code, please contact Lovisa Franzén (lovisa.franzen@scilifelab.se)
+For questions related to this repo and its content, please contact Lovisa Franzén (lovisa.franzen@scilifelab.se)
 
 
