@@ -11,12 +11,23 @@ $ Corresponding authors
 
 This repository contains the R code used to produce all the analyses and figures presented in the article *Translational mapping of spatially resolved transcriptomes in human and mouse pulmonary fibrosis* (Franzén & Olsson Lindvall et al.).
 
+<a href="url"><img src="/doc/graphical_abstract.png" align="center" height="250" width="250" ></a>
 
 
 ## Content
-
-
-
+* `bin/`  
+* `data/`  
+  * `visium/`  
+    * `human/`  
+    * `mouse/`  
+* `scripts/`: All main R scripts used for processing and analysing the Visium data  
+* `results/`  
+* `doc/`  
+* `semla_analysis/`  
+  * `bin/`  
+  * `data/`  
+  * `scripts/`:
+  * `results/`  
 
 ## Contact
 
