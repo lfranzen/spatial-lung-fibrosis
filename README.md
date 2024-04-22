@@ -11,8 +11,7 @@ $ Corresponding authors
 
 This repository contains the R code used to produce all the analyses and figures presented in the article *Translational mapping of spatially resolved transcriptomes in human and mouse pulmonary fibrosis* (Franzén & Olsson Lindvall et al.).
 
-<a href="url"><img src="/doc/graphical_abstract.png" align="center" height="250" width="250" ></a>
-
+<p align="center"><img src="/doc/graphical_abstract.png" height="400" width=400"></p>
 
 ## Content
 * `bin/`  
