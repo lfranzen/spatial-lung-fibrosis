@@ -44,6 +44,17 @@ The data processing workflows have been illustrated [here](https://github.com/lf
   * `scripts/`: All scripts used for analyzing the Visium data with *semla*
 
 
+## Get started
+
+If you intend to replicate some of the analyses presented here, it is recommended to do the following once you have forked/downloaded the content of this repo:
+
+1. Move the `semla_analysis` folder and content to another location (this analysis path has its own R project file and package requirements)  
+2. Download the spaceranger output data and/or STUtility/Seurat objects and place them in their correct locations (see `data/README.txt`)  
+3. Install [`renv`](https://rstudio.github.io/renv/articles/renv.html) and install the necessary packages from the `renv.lock` file by using `renv::restore()`
+4. Manually install the packages within the `bin/` folder  
+5. Read the `scripts/README.txt` for information about all scripts and their content
+
+
 ## Contact
 
 For questions related to this repo and its content, please contact Lovisa Franzén (lovisa.franzen@scilifelab.se)
