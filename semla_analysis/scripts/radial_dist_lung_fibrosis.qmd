@@ -1,0 +1,755 @@
+---
+title: "Extract radial distance vectors for lung fibrosis data sets"
+format: html
+editor: visual
+---
+
+## Intro
+
+Extract radial distance vectors for data sets from human IPF and mouse BLM experiments.
+
+Use AbBa spot selection and TLS areas for center of origin
+
+```{r}
+# remotes::install_url("https://github.com/ludvigla/semla/releases/download/v1.1.6/semla_1.1.6.tar.gz")
+```
+
+```{r}
+#ERROR: dependencies ‘imager’, ‘raster’, ‘NNLM’, ‘spatstat.core’ 
+
+# install.packages("/Users/lovisa.franzen/Documents/PhD_Lung/spatial-lung-semla/src/spatstat.core-2.4-3.tar.gz", repos = NULL, type="source")
+# install.packages("/Users/lovisa.franzen/Documents/PhD_Lung/spatial-lung-semla/src/STUtility-1.1.1.tar.gz", repos = NULL, type="source")
+
+# install.packages("https://cran.r-project.org/src/contrib/Archive/Matrix/Matrix_1.5-1.tar.gz")
+
+```
+
+```{r}
+library(semla)
+library(dplyr)
+library(patchwork)
+library(RColorBrewer)
+library(tibble)
+```
+
+```{r}
+color_10_d3 <- ggsci::pal_d3("category10")(10)
+color_10_set3 <- RColorBrewer::brewer.pal(10, "Set3")
+
+color_10_gradient <- hcl.colors(n = 10, palette = "Zissou 1", rev = T)
+color_10_gradient <- hcl.colors(n = 10, palette = "Set2")
+color_10_gradient <- RColorBrewer::brewer.pal(12, "Set3")
+
+DIR_DATA <- file.path(getwd(), "..", "data")
+DIR_RES <- file.path(getwd(), "..", "results")
+```
+
+## Read human lung data
+
+```{r}
+se_stu <- readRDS(file = file.path(DIR_DATA, "hs_visium_preproc_A_se_obj.rds"))
+img_paths <- se_stu@tools$Staffli@imgs
+img_paths_new <- gsub(x = img_paths,
+                      pattern = "/home/st-analysis_home/lovisa.franzen/analysis/lung/spatial-lung-fibrosis/data/human/visium",
+                      replacement = "~/Documents/PhD_Lung/AZ_Human_Lung/210330_Visium/data/novaseq_210429/spaceranger_out"
+                      )
+
+se_stu@tools$Staffli@imgs <- img_paths_new
+```
+
+Add metadata
+
+```{r}
+mdata <- readRDS(file = file.path(DIR_DATA, "hs_visium_preproc_A_se_full_metadata.rds"))
+# mdata |> glimpse()
+colnames_include <- grep(pattern = "^factor|^f14|^d_|^c2l_", x = colnames(mdata), value = T)
+
+se_stu <- AddMetaData(se_stu, metadata = mdata[,colnames_include])
+```
+
+```{r}
+se_stu$bcs_stutility <- rownames(se_stu[[]])
+se <- UpdateSTUtilityV1Object(se_stu)
+rm(se_stu)
+```
+
+```{r}
+se
+head(se[[]])
+se@tools$Staffli@imgs
+```
+
+```{r}
+se[[]] |> select(sample_name) |> unique() |> arrange(sample_name)
+```
+
+```{r}
+# se_he <- SubsetSTData(object = se, sample_name %in% c(
+#                     "HC_3.TH030.G0.1",
+#                     "IPF_1.TD013.G3.1",
+#                     "IPF_2.TD022.G3.2",
+#                     "IPF_3.TD031.G1.2"))
+```
+
+```{r fig.width=3, fig.height=12}
+# se_he <- LoadImages(se_he)
+# ImagePlot(se_he, ncol = 1) & theme(plot.margin = margin(c(0,0,0,0)))
+```
+
+### Subset IPF
+
+```{r}
+se_ipf <- SubsetSTData(se, condition == "IPF")
+```
+
+```{r}
+se_ipf <- LoadImages(se_ipf, image_height = 400)
+```
+
+```{r}
+se_ipf2 <- SubsetSTData(se_ipf, spots = se_ipf$annotation[!is.na(se_ipf$annotation)] |> names())
+se_ipf2$annotation <- factor(se_ipf2$annotation)
+```
+
+```{r}
+cols_anno <- setNames(RColorBrewer::brewer.pal(length(levels(se_ipf2$annotation)), "Spectral"),
+                      nm = levels(se_ipf2$annotation))
+MapLabels(se_ipf2, 
+          column_name = "annotation", 
+          split_labels = T, 
+          section_number = 5,
+          pt_size = 0.8, 
+          ncol = 4, 
+          colors = cols_anno) &
+  theme(plot.subtitle = element_blank(), 
+        plot.title = element_text(size=8), 
+        legend.position = "none")
+
+MapLabels(se_ipf2, column_name = "annotation") & ThemeClean()
+```
+
+## Radial distance analysis
+
+### All annotated Inflammation regions in IPF
+
+```{r}
+se_ipf2 <- RadialDistance(se_ipf2, 
+                          column_name = "annotation", 
+                          selected_groups = "Inflammation", 
+                          convert_to_microns = T,
+                          remove_singletons = F)
+```
+
+**Export**
+
+```{r}
+mdata_export <- se_ipf2[[]] |> select(bcs_stutility, sample_name, r_dist_Inflammation)
+write.csv(mdata_export, file.path("~/Desktop/hs_visium_se_ipf2_TLS_distance_meta_data.csv"))
+
+
+# mdata_export <- read.csv(file.path("~/Desktop/hs_visium_A-NMF30-F14hi-C0_distance_meta_data.csv"), 
+#                          row.names = 1)
+# se_ipf_f14hi <- AddMetaData(se_ipf_f14hi, metadata = mdata_export |> select(r_dist_F14_C0))
+```
+
+```{r}
+MapFeatures(se_ipf2, 
+            features = "r_dist_Inflammation", pt_size=1.4,
+            colors = c("black", RColorBrewer::brewer.pal(9, "Reds")[2:9] |> rev(), "white", "white")) & 
+  ThemeClean()
+```
+
+**No singletons** (Made no difference)
+
+```{r}
+se_ipf2 <- RadialDistance(se_ipf2, 
+                          column_name = "annotation", 
+                          selected_groups = "Inflammation", 
+                          column_suffix = "_nosingle",
+                          convert_to_microns = T,
+                          remove_singletons = T)
+```
+
+```{r}
+MapFeatures(se_ipf2, 
+            features = "r_dist_Inflammation_nosingle", 
+            pt_size=1.4,
+            colors = c("black", RColorBrewer::brewer.pal(9, "Reds")[2:9] |> rev(), "white", "white")) & 
+  ThemeClean()
+```
+
+**Export**
+
+```{r}
+mdata_export <- se_ipf2[[]] |> select(bcs_stutility, sample_name, r_dist_Inflammation_nosingle)
+write.csv(mdata_export, file.path("~/Desktop/hs_visium_se_ipf2_TLS_distance_nosingle_meta_data.csv"))
+```
+
+### Disconnected annotated Inflammation regions in IPF
+
+```{r}
+se_ipf2 <- DisconnectRegions(se_ipf2,
+                            column_name = "annotation", 
+                            selected_groups = "Inflammation")
+```
+
+```{r}
+MapLabels(se_ipf2, 
+          column_name = "Inflammation_split", 
+          label_by = "sample_name", drop_na = T,
+          ncol = 4, 
+          pt_size = 1) +
+  plot_layout(guides = "collect") &
+  theme(plot.subtitle = element_blank(), 
+        plot.title = element_text(size=7), 
+        legend.position = "none")
+```
+
+```{r}
+selected_regions_infl <- se_ipf2$Inflammation_split |> unique() |> grep(pattern = "_region", value = T)
+```
+
+```{r}
+se_ipf2 <- RadialDistance(object = se_ipf2, 
+                         column_name = "Inflammation_split", 
+                         selected_groups = selected_regions_infl, 
+                         remove_singletons = T)
+```
+
+```{r}
+mdata_export <- se_ipf2[[]] |> select(bcs_stutility, sample_name, Inflammation_split, 
+                                     paste0("r_dist_", selected_regions_infl))
+
+write.csv(mdata_export, file.path("~/Desktop/hs_visium_se_ipf2_Inflammation_disconnected_distance_nosingle_meta_data.csv"))
+```
+
+#### Quick look at data
+
+```{r}
+se_ipf2_infl <- SubsetSTData(se_ipf2, annotation == "Inflammation")
+
+se_ipf2_infl <- se_ipf2_infl |> 
+  FindVariableFeatures() |>
+  RunPCA() |>
+  FindNeighbors(reduction = "pca", dims = 1:30) |>
+  FindClusters()
+```
+
+```{r}
+infl_region_markers <- FindAllMarkers(se_ipf2_infl)
+```
+
+```{r}
+top_markers <- infl_region_markers |> 
+  filter(p_val_adj < 0.01, avg_log2FC>0) |> 
+  group_by(cluster) |> 
+  slice_max(n = 3, order_by = avg_log2FC);top_markers
+
+markers <- top_markers$gene
+```
+
+Clusters 0 and 3 display B and T cell markers, other clusters have markers of non-immune cells
+
+```{r}
+se_ipf2_infl <- RunUMAP(se_ipf2_infl, dims = 1:30)
+```
+
+```{r}
+DimPlot(se_ipf2_infl, group.by = "Inflammation_split")
+
+DimPlot(se_ipf2_infl)
+```
+
+### Disconnected FX (TLS?) regions in IPF
+
+```{r}
+MapFeatures(se_ipf, 
+            features = "factor_6",
+            label_by = "sample_name", 
+            colors = c("grey", "red", "red"),
+            min_cutoff = 0.9,
+            ncol = 7, 
+            pt_size = 1) +
+  plot_layout(guides = "collect") &
+  theme(plot.subtitle = element_blank(), 
+        plot.title = element_text(size=7), 
+        legend.position = "bottom")
+```
+
+### All F14hiC0 regions in IPF samples
+
+```{r}
+se_ipf$f14_nbs_clusters2 |> unique()
+
+se_ipf[[]] |>
+  group_by(sample_name, f14_nbs_clusters2) |>
+  summarise(total_count=n(),.groups = 'drop') |>
+  filter(f14_nbs_clusters2=="F14_C0")
+```
+
+**Radial distance, including singletons**
+
+```{r}
+se_ipf <- RadialDistance(se_ipf, 
+                        remove_singletons = F,
+                        column_name = "f14_nbs_clusters2", 
+                        selected_groups = "F14_C0",
+                        convert_to_microns = T)
+```
+
+```{r fig.width = 9, fig.height=4}
+MapFeatures(se_ipf, 
+            features = "r_dist_F14_C0", 
+            colors = brewer.pal(8, "Spectral"), 
+            label_by = "sample_name", 
+            ncol = 7, pt_size = 1,
+            max_cutoff = 0.6) +
+  plot_layout(guides = "collect") &
+  ThemeClean()
+  # theme(legend.position = "right", legend.text = element_text(angle = 0, hjust=0))
+```
+
+**Export**
+
+```{r}
+mdata_export <- se_ipf[[]] |> select(bcs_stutility, sample_name, r_dist_F14_C0)
+write.csv(mdata_export, file.path("~/Desktop/hs_visium_A-NMF30-F14hi-C0_distance_meta_data.csv"))
+```
+
+```{r}
+dat <- read.csv(file.path("~/Desktop/hs_visium_A-NMF30-F14hi-C0_distance_meta_data.csv"))
+dat$sample_name |> unique() |> length()
+```
+
+**Radial distance, removing singletons**
+
+```{r}
+se_ipf <- RadialDistance(se_ipf, 
+                        remove_singletons = T,
+                        column_name = "f14_nbs_clusters2", 
+                        selected_groups = "F14_C0",
+                        column_suffix = "_nosingle",
+                        convert_to_microns = T)
+```
+
+```{r fig.width = 9, fig.height=4}
+MapFeatures(se_ipf, 
+            features = "r_dist_F14_C0_nosingle", 
+            colors = brewer.pal(8, "Spectral"), 
+            label_by = "sample_name", 
+            ncol = 7, 
+            pt_size = 1,
+            max_cutoff = 0.6) +
+  plot_layout(guides = "collect") &
+  theme(plot.subtitle = element_blank(), 
+        plot.title = element_text(size=7), 
+        legend.position = "none")
+```
+
+```{r}
+mdata_export <- se_ipf[[]] |> select(bcs_stutility, sample_name, r_dist_F14_C0_nosingle)
+write.csv(mdata_export, file.path("~/Desktop/hs_visium_A-NMF30-F14hi-C0_distance_nosingle_meta_data.csv"))
+```
+
+### Disconnected F14hiC0 regions in IPF samples
+
+Label each separate F14hiC0 region and identify radial distances from each region separately
+
+```{r}
+se_ipf <- DisconnectRegions(se_ipf,
+                            column_name = "f14_nbs_clusters2", 
+                            selected_groups = "F14_C0")
+```
+
+```{r}
+MapLabels(se_ipf, 
+          column_name = "F14_C0_split", 
+          label_by = "sample_name", drop_na = T,
+          ncol = 7, 
+          pt_size = 1) +
+  plot_layout(guides = "collect") &
+  theme(plot.subtitle = element_blank(), 
+        plot.title = element_text(size=7), 
+        legend.position = "none")
+```
+
+**Radial distance, excuding singletons**
+
+```{r}
+selected_regions <- se_ipf$F14_C0_split |> unique() |> grep(pattern = "_region", value = T)
+```
+
+```{r}
+se_ipf <- RadialDistance(object = se_ipf, 
+                         column_name = "F14_C0_split", 
+                         selected_groups = selected_regions, 
+                         remove_singletons = T)
+```
+
+```{r}
+MapFeatures(se_ipf, 
+            # section_number = 17,
+            features = "r_dist_S17_region1", 
+            colors = hcl.colors(n=8, palette = "Earth"), 
+            label_by = "sample_name", 
+            ncol = 7, 
+            pt_size = 1,
+            max_cutoff = 0.6) +
+  plot_layout(guides = "collect") &
+  theme(plot.subtitle = element_blank(), 
+        plot.title = element_text(size=7), 
+        legend.position = "none")
+```
+
+```{r}
+# png(filename = paste0("~/Desktop/ipf_figs/S", i, "_he_image.png"), 
+#       width = 6*300, height = 6*300, res = 300)
+# print(ImagePlot(se_ipf, sampleIDs = 1:19, label_by = "sample_name"), n)
+# dev.off()
+n_samples <- (se_ipf$sample_id |> unique() |> length())
+for(i in 1:n_samples){
+#   png(filename = paste0("~/Desktop/ipf_figs/S", i, "_he_image.png"), 
+#       width = 4*300, height = 4*300, res = 300)
+#   print(ImagePlot(se_ipf, sampleIDs = i, label_by = "sample_name"))
+#   dev.off()
+  png(filename = paste0("~/Desktop/ipf_figs/S", i, "_c2l_multimap.png"), 
+    width = 7*300, height = 12*300, res = 300)
+  p1 <- MapMultipleFeatures(se_ipf,
+                      features = c("c2l_KRT5..KRT17.", "c2l_Transitional.AT2", 
+                                   "c2l_AT2", "c2l_SCGB3A2."), 
+                      max_cutoff = 0.999, 
+                      label_by = "sample_name",
+                      section_number = i,
+                      pt_size = 1.5, colors = c("magenta", "royalblue", "black", "orange")) &
+    theme(aspect.ratio = 1)
+  p2 <- MapLabels(se_ipf, 
+                column_name = "f14_nbs_clusters2", 
+                label_by = "sample_name",
+                section_number = i, 
+                colors = c(color_10_d3[1:6], "black", "grey80"),
+                pt_size = 1.5) &
+    theme(aspect.ratio = 1, legend.position = "right")
+  p3 <- MapFeatures(se_ipf,
+            section_number = i,
+            features = c("c2l_KRT5..KRT17.", 
+                         "c2l_Transitional.AT2", 
+                         "c2l_AT2"),
+            blend = T,
+            label_by = "sample_name", scale_alpha = T,
+            pt_size = 1.5) &
+  guides(color = guide_legend(override.aes = list(size = 3), label.hjust = 0, ncol = 1)) & 
+  theme(aspect.ratio = 1, legend.position = "right")
+  print(p1/p3/p2)
+  dev.off()
+}
+
+
+# png(filename = paste0("~/Desktop/ipf_figs/ipf_c2l_multimap_S", 11, ".png"), 
+#     width = 7*300, height = 4*300, res = 300)
+
+# ImagePlot(se_ipf, sampleIDs = 11, label_by = "sample_name")
+# 
+# p1 <- MapLabels(se_ipf, 
+#                 column_name = "f14_nbs_clusters2", 
+#                 label_by = "sample_name",
+#                 section_number = 11, 
+#                 colors = c(color_10_d3[1:6], "black", "grey80"),
+#                 pt_size = 1.5) &
+#   theme(aspect.ratio = 1, legend.position = "right");p1
+# 
+# p2 <- MapMultipleFeatures(se_ipf,
+#                     features = c("c2l_KRT5..KRT17.", "c2l_Transitional.AT2", "c2l_AT2",
+#                                  "c2l_SCGB3A2."), 
+#                     max_cutoff = 0.999, 
+#                     label_by = "sample_name",
+#                     section_number = 11,
+#                     pt_size = 1.5, colors = c("magenta", "royalblue", "black", "orange")) &
+#   theme(aspect.ratio = 1);p2
+# dev.off()# 
+```
+
+```{r}
+# VlnPlot(se_ipf, pt.size = 0, 
+#         features = c("c2l_KRT5..KRT17.", "c2l_Transitional.AT2", "c2l_AT1", "c2l_AT2",
+#                                  "c2l_SCGB3A2.", "c2l_Myofibroblasts"),
+#         group.by = "f14_nbs_clusters2", ncol = 6)
+```
+
+```{r fig.width=10, fig.height=12}
+c2l_labs <- grep("c2l", colnames(se_ipf[[]]), value = T)
+
+MapFeatures(se_ipf,
+            section_number = 16,
+            features = c2l_labs, 
+            colors = hcl.colors(n=8, palette = "Rocket", rev = T), 
+            label_by = "sample_name", 
+            ncol = 6,
+            pt_size = 1)
+  # plot_layout(guides = "collect") &
+  # theme(plot.subtitle = element_blank(), 
+  #       plot.title = element_text(size=7), 
+  #       legend.position = "none")
+```
+
+```{r}
+MapFeatures(se_ipf,
+            section_number = 16,
+            features = c("c2l_KRT5..KRT17.", 
+                         "c2l_Transitional.AT2", 
+                         "c2l_AT2"),
+            blend = T,
+            label_by = "sample_name", scale_alpha = T,
+            pt_size = 1) &
+  guides(color = guide_legend(override.aes = list(size = 3), label.hjust = 0, ncol = 1)) & 
+  theme(aspect.ratio = 1, legend.position = "right")
+```
+
+```{r}
+mdata_export <- se_ipf[[]] |> select(bcs_stutility, sample_name, F14_C0_split, 
+                                     paste0("r_dist_", selected_regions))
+
+write.csv(mdata_export, 
+          file.path("~/Desktop/hs_visium_A-NMF30-F14hi-C0_disconnected_distance_nosingle_meta_data.csv"))
+```
+
+### Clean up
+
+```{r}
+rm(se);rm(se_ipf);rm(se_ipf2);rm(mdata);rm(mdata_export)
+```
+
+## Read mouse lung data
+
+```{r}
+se_stu_ms <- readRDS(file = file.path(DIR_DATA, "mm_visium_preproc_se_obj_nmf30_c2l.rds"))
+
+img_paths <- se_stu_ms@tools$Staffli@imgs
+img_paths_new <- gsub(
+  x = img_paths,
+  pattern = "/home/st-analysis_home/lovisa.franzen/analysis/lung/spatial-lung-fibrosis/data/mouse/visium",
+  replacement = "/Users/lovisa.franzen/Documents/PhD_Lung/AZ_mouse_bleo_2021/data/spaceranger_out"
+  )
+
+se_stu_ms@tools$Staffli@imgs <- img_paths_new
+```
+
+```{r}
+se_stu_ms$bcs_stutility <- rownames(se_stu_ms[[]])
+se <- UpdateSTUtilityV1Object(se_stu_ms)
+
+rm(se_stu_ms)
+```
+
+```{r}
+# saveRDS(se, file.path(DIR_DATA, "mm_visium_preproc_se_obj_nmf30_c2l_semla.rds"))
+```
+
+```{r}
+# se <- readRDS(file.path(DIR_DATA, "mm_visium_preproc_se_obj_nmf30_c2l_semla.rds"))
+```
+
+```{r}
+# Sys.glob(paths = "~/Documents/PhD_Lung/AZ_mouse_bleo_2021/data/spaceranger_out/*/spatial/tissue_hires_image.png")
+```
+
+### All F14hi-C0 regions in BLM-d21 samples
+
+Add metadata for F14hi cluster labels
+
+```{r}
+mdat <- read.csv(file.path(DIR_DATA, "mm_visium_nmf30_d21_se_processed_metadata.csv"), row.names = 1)
+```
+
+```{r}
+mdat_add <- se@meta.data[, c("sample_id", "bcs_stutility")] |> 
+  tibble::rownames_to_column(var = "rownames")
+mdat_add <- merge(mdat, mdat_add, by.x = "barcode", by.y = "bcs_stutility")
+mdat_add <- mdat_add |> select(rownames, barcode, factor_14_cutoff, 
+                               f14_subclusters, f14_subclusters2, d_cF14hi_C0,
+                               f14_nbs_clusters, f14_nbs_clusters2)
+rownames(mdat_add) <- mdat_add$rownames
+head(mdat_add)
+
+se <- AddMetaData(se, mdat_add)
+```
+
+Subset se data to only d21 BLM samples
+
+```{r}
+se_blm_d21 <- SubsetSTData(se, expression = group == "d21_BLM")
+```
+
+```{r}
+se_blm_d21$f14_subclusters |> unique()
+
+se_blm_d21[[]] |>
+  group_by(sample_name, f14_subclusters) |>
+  summarise(total_count=n(), .groups = 'drop') |>
+  filter(f14_subclusters == "F14hi_C0")
+```
+
+```{r fig.width=10, fig.height=10}
+se_blm_d21$f14_subclusters2 <- factor(se_blm_d21$f14_subclusters2, 
+                                      levels = c("other", "fibrosis",
+                                                 "F14hi_C0", "F14hi_C1", "F14hi_C2"))
+
+MapLabels(se_blm_d21, 
+          column_name = "f14_subclusters2",
+          colors = c("grey90", "grey60", color_10_d3[1:3]),
+          label_by = "sample_name",
+          ncol = 3, pt_size = 1) +
+  plot_layout(guides = "collect") &
+  guides(fill = guide_legend(override.aes = list(size = 3), 
+                             ncol = 1)) &
+  theme(legend.position = "right")
+```
+
+Compute radial distances from F14hi_C0
+
+```{r}
+se_blm_d21 <- RadialDistance(se_blm_d21, 
+                             remove_singletons = F,
+                             column_name = "f14_subclusters", 
+                             selected_groups = "F14hi_C0",
+                             convert_to_microns = T)
+```
+
+```{r fig.width = 8, fig.height=8}
+MapFeatures(se_blm_d21, 
+            features = "r_dist_F14hi_C0", 
+            colors = hcl.colors(20, palette = "Earth"), 
+            label_by = "sample_name", 
+            ncol = 3, pt_size = 1,
+            max_cutoff = 0.6) +
+  plot_layout(guides = "collect") &
+  theme(legend.position = "bottom", plot.subtitle = element_blank())
+```
+
+**Export**
+
+```{r}
+mdata_export <- se_blm_d21[[]] |> select(bcs_stutility, sample_name, r_dist_F14hi_C0)
+mdata_export <- mdata_export |> rownames_to_column(var = "bcs_semla")
+write.csv(mdata_export, file.path(DIR_RES, "mm_visium_NMF30_d21-F14hi-C0_distance_meta_data.csv"))
+```
+
+### All Krt8-ADI-high regions in BLM samples
+
+```{r}
+krt8adi_cutoff <- 2.5
+se$krt8adi_high <- ifelse(se$c2l_Krt8.ADI > krt8adi_cutoff, "high", "low")
+se$krt8adi_high |> unique()
+se$krt8adi_high2 <- ifelse(se$c2l_Krt8.ADI > krt8adi_cutoff, "krt8adi_hi", "krt8adi_low")
+
+se[[]] |> 
+  group_by(sample_name, krt8adi_high) |> 
+  summarise(total_count=n(),.groups = 'drop') |> 
+  filter(krt8adi_high=="high")
+# |> 
+#   filter(total_count>10) |> 
+#   select(sample_name) |>
+#   unique() |> unlist() |> as.character()
+# samples_krt8adi_hi
+# 
+# se_krt8adi_hi <- SubsetSTData(se, expression = sample_name %in%  samples_krt8adi_hi)
+# 
+# se_krt8adi_hi$krt8adi_high2 <- ifelse(se_krt8adi_hi$c2l_Krt8.ADI > krt8adi_cutoff, 
+#                                       "krt8adi_hi", "krt8adi_low")
+# 
+# se_krt8adi_hi$sample_name |> unique()
+```
+
+Subset to only BLM data
+
+```{r}
+se_blm <- SubsetSTData(se, expression = condition == "bleomycin")
+```
+
+```{r fig.width = 10, fig.height=4}
+MapLabels(se_blm, 
+          column_name = "krt8adi_high2",
+          colors = brewer.pal(3, "Spectral")[c(1,3)],
+          label_by = "sample_name",
+          ncol = 6, pt_size = 1) +
+  plot_layout(guides = "collect") &
+  guides(fill = guide_legend(override.aes = list(size = 3), 
+                             ncol = 1)) &
+  theme(legend.position = "right")
+```
+
+```{r}
+se_blm <- RadialDistance(se_blm, 
+                         remove_singletons = F,
+                         column_name = "krt8adi_high2", 
+                         selected_groups = "krt8adi_hi",
+                         convert_to_microns = T)
+```
+
+```{r fig.width = 10, fig.height=4}
+MapFeatures(se_blm, 
+            features = "r_dist_krt8adi_hi", 
+            colors = brewer.pal(8, "Spectral"), 
+            label_by = "sample_name", 
+            ncol = 6, pt_size = 1,
+            max_cutoff = 0.7) +
+  plot_layout(guides = "collect") &
+  theme(legend.position = "right", legend.text = element_text(angle = 0, hjust=0))
+```
+
+**Export**
+
+```{r}
+mdata_export <- se_blm[[]] |> select(bcs_stutility, sample_name, r_dist_krt8adi_hi)
+write.csv(mdata_export, file.path("~/Desktop/ms_visium_Krt8ADIhi_distance_meta_data.csv"))
+
+# mdata_export <- read.csv(file.path("~/Desktop/ms_visium_Krt8ADIhi_distance_meta_data.csv"), 
+#                          row.names = 1)
+# se_blm <- AddMetaData(se_blm, metadata = mdata_export |> select(r_dist_krt8adi_hi))
+```
+
+### All TLS regions in BLM d21
+
+```{r}
+spots_select <- se_blm[[]] |> 
+  filter(!is.na(annotation), day == "d21")
+se_blm2 <- SubsetSTData(se_blm, spots = rownames(spots_select))
+```
+
+```{r}
+MapLabels(se_blm2, column_name = "annotation2", ncol = 3, label_by = "sample_name") + 
+  plot_layout(guides = "collect") & 
+  guides(fill = guide_legend(override.aes = list(size = 3))) &
+  theme(legend.position = "right")
+```
+
+```{r}
+se_blm2 <- RadialDistance(se_blm2, 
+                          column_name = "annotation", 
+                          selected_groups = "Inflammation", 
+                          convert_to_microns = T,
+                          remove_singletons = F)
+```
+
+```{r fig.width = 6, fig.height=3}
+MapFeatures(se_blm2, 
+            features = "r_dist_Inflammation", 
+            colors = brewer.pal(8, "Spectral"), 
+            label_by = "sample_name", 
+            ncol = 3, pt_size = 1,
+            max_cutoff = 0.7) +
+  plot_layout(guides = "collect") &
+  theme(legend.position = "right", legend.text = element_text(angle = 0, hjust=0))
+```
+
+**Export**
+
+```{r}
+mdata_export <- se_blm2[[]] |> select(bcs_stutility, sample_name, r_dist_Inflammation)
+write.csv(mdata_export, file.path("~/Desktop/ms_visium_se_blm2_TLS_distance_meta_data.csv"))
+```
+
+## Session Info
+
+```{r}
+sessionInfo()
+```

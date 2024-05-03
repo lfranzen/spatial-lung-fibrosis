@@ -1,0 +1,513 @@
+---
+title: "Fibrosis-Alveolar radial distance DEGs"
+format: html
+editor: visual
+---
+
+## Intro
+
+DEGs for IPF-alveolar tissue have been identified using a pseudo-bulk DGE analysis versus healthy control lung tissue.
+
+In this analysis, we want to see whether there is a spatial pattern associated with these DEGs based on their proximity to areas of fibrosis.
+
+To do this, the following steps will be taken:
+
+1.  Select the annotated IPF sections that contains annotated alveolar tissue
+2.  Extract radial distances from regions annotated as either "Diseased" or "Suspect Fibrosis"
+3.  Prioritize genes to examine
+4.  Select only spots annotated as either fibrotic or alveolar
+5.  Visualize the expression of selected genes along the fibrotic-distance-axis within the fibrotic and alveolar tissue
+
+```{r}
+library(semla)
+library(dplyr)
+library(patchwork)
+library(RColorBrewer)
+library(tibble)
+library(tidyr)
+```
+
+```{r}
+DIR_DATA <- file.path(getwd(), "..", "data")
+DIR_RES <- file.path(getwd(), "..", "results")
+```
+
+```{r}
+color_10_d3 <- ggsci::pal_d3("category10")(10)
+color_10_set3 <- RColorBrewer::brewer.pal(10, "Set3")
+
+color_10_gradient <- hcl.colors(n = 10, palette = "Zissou 1", rev = T)
+color_10_gradient <- hcl.colors(n = 10, palette = "Set2")
+color_10_gradient <- RColorBrewer::brewer.pal(12, "Set3")
+
+col_scale_earth <- hcl.colors(n = 10, palette = "Earth")
+col_scale_temps <- hcl.colors(n = 10, palette = "Temps", rev = T)
+col_scale_spec <- RColorBrewer::brewer.pal(9, "Spectral")
+col_scale_viridis <- viridis::viridis(10)
+
+cols_annotation2 <- setNames(object = c("#5DA6C6",
+                                        "#215189",
+                                        "#E391BA",
+                                        "#EDC962",
+                                        "#AB4A3D",
+                                        "#8D71A6"),
+                                        nm = c("Normal Alveolar and Other",
+                                               "Large Airway",
+                                               "Blood Vessel",
+                                               "Diseased",
+                                               "Inflammation",
+                                               "Suspect Fibrosis"))
+```
+
+## Prepare data
+
+### DEG lists
+
+```{r}
+gs1 <- c(
+  "BDKRB2",
+  "FSTL3",
+  "CXCL9",
+  "TAP1",
+  "PHLDA1",
+  "UNC5B",
+  "PALD1",
+  "ITPKC",
+  "SAP30",
+  "SYDE1",
+  "FN1",
+  "ZNF189",
+  "HMOX2",
+  "OAS3",
+  "TNFAIP1",
+  "APOL1"
+)
+```
+
+```{r}
+fname <- "DEA_alv_vs_alvCtrl_fib_vs_alvCtrl_shared_up.csv"
+gs2_file <- read.csv(file.path(DIR_DATA, fname), header = F)
+gs2 <- gs2_file |> pull(1)
+gs2 |> length()
+```
+
+### IPF Visium data
+
+**Read data**
+
+Use *semla* object that was generated in the "hsF14-C0_spatial_quantification.qmd" script.
+
+```{r}
+se <- readRDS(file.path(DIR_DATA, 'hs_visium_preproc_A_se_full_metadata_semla.rds'))
+```
+
+**Filter data**
+
+```{r}
+se_ipf <- SubsetSTData(se, condition == "IPF")
+se_ipf <- SubsetSTData(se_ipf, annotation != "NA")
+```
+
+Select on samples with a larger n of spots annotated as alveolar
+
+```{r}
+n_cutoff <- 100
+samples_select <- se_ipf@meta.data |> 
+  subset(annotation == "Normal Alveolar and Other") |> 
+  group_by(sample_name) |>
+  summarise(n=n()) |>
+  arrange(n) |> 
+  filter(n > n_cutoff) |> 
+  pull(sample_name) |> 
+  unique()
+  
+samples_select; samples_select |> length()
+```
+
+```{r}
+se_ipf <- SubsetSTData(se_ipf, sample_name %in% samples_select)
+```
+
+**Format annotations**
+
+```{r fig.width=8, fig.height=8}
+# MapLabels(se_ipf, label_by = "sample_name",
+#           column_name = "annotation", colors = cols_annotation2) +
+#   plot_layout(guides = "collect") & 
+#   guides(fill = guide_legend(override.aes = list(size = 3))) &
+#   theme(aspect.ratio = 1, legend.position = "right")
+```
+
+```{r}
+se_ipf$annotation2 <- ifelse(se_ipf$annotation %in% c("Diseased", "Suspect Fibrosis"), 
+                             "fibrotic",
+                             ifelse(se_ipf$annotation %in% "Normal Alveolar and Other",
+                                    "alveolar",
+                                    se_ipf$annotation))
+
+se_ipf$annotation2 |> unique()
+```
+
+```{r fig.width=10, fig.height=6}
+cols_annotation3 <- c(cols_annotation2,
+                      setNames(c("#EDC962", "#5DA6C6"), nm = c("fibrotic", "alveolar"))
+                      )
+MapLabels(se_ipf, label_by = "sample_name", ncol = 4,
+          column_name = "annotation2", colors = cols_annotation3) +
+  plot_layout(guides = "collect") & 
+  guides(fill = guide_legend(override.aes = list(size = 3))) &
+  theme(aspect.ratio = 1, legend.position = "right")
+```
+
+### Extract radial distances from fibrotic tissue
+
+Get radial distances from "fibrotic" region, and remove singletons to avoid general patterns from single spots residing within the alveolar tissue
+
+```{r}
+se_ipf <- RadialDistance(se_ipf, 
+                         remove_singletons = F,  # remove singletons - may not make a huge difference
+                         column_name = "annotation2", 
+                         selected_groups = "fibrotic",
+                         convert_to_microns = T)
+```
+
+**Filter data to keep only fibrotic and alveolar tissue**
+
+```{r}
+se_ipf_filt <- SubsetSTData(se_ipf, annotation2 %in% c("fibrotic", "alveolar"))
+```
+
+**Plot**
+
+```{r fig.width=10, fig.height=5}
+se_ipf_filt$r_dist_fibrotic_sqrt <- sign(se_ipf$r_dist_fibrotic)*sqrt(abs(se_ipf$r_dist_fibrotic))
+p1 <- MapFeatures(se_ipf_filt, features = "r_dist_fibrotic_sqrt", 
+            section_number = 6, label_by = "sample_name",
+            center_zero = TRUE, pt_size = 2, 
+            colors = RColorBrewer::brewer.pal(n = 11, name = "RdBu"),
+            override_plot_dims = TRUE)
+p2 <- MapFeatures(se_ipf_filt, features = "r_dist_fibrotic_sqrt", 
+            section_number = 7, label_by = "sample_name",
+            center_zero = TRUE, pt_size = 2, 
+            colors = RColorBrewer::brewer.pal(n = 11, name = "RdBu"),
+            override_plot_dims = TRUE)
+p1|p2
+```
+
+```{r fig.width=10, fig.height=6}
+MapFeatures(se_ipf_filt, 
+            # features = "r_dist_fibrotic_sqrt", 
+            features = "r_dist_fibrotic", 
+            max_cutoff = 0.95, min_cutoff = 0.05,
+            label_by = "sample_name", ncol = 4,
+            center_zero = TRUE, pt_size = 2, 
+            colors = RColorBrewer::brewer.pal(n = 11, name = "RdBu"),
+            override_plot_dims = TRUE) +
+  plot_layout(guides = "collect") & 
+  theme(aspect.ratio = 1, legend.position = "right", legend.text = element_text(angle=0, hjust=0))
+```
+
+## DEG expression along radial distance
+
+```{r}
+# sel_genes <- gs1 #[1:12]
+```
+
+### Distance\~expression correlation
+
+**Identify genes with significant linear relationships**
+
+-   Based on shared DEGs between fibrotic and alveolar regions (gs2)
+
+-   For distances 0-500 or 0-1000
+
+```{r}
+#' Function to compute correlation values for selected genes
+#' along the radial distance.
+RunGeneDistanceCor <- function(
+    object, 
+    dist_colname,
+    genes_select, 
+    dist_cutoff = NULL,
+    dist_lower_cutoff = 0){
+  
+  if (is.null(dist_cutoff)) dist_cutoff <- 500
+  
+  gene_data <- object[[]] %>% 
+    bind_cols(FetchData(object, vars = genes_select, )) %>% 
+    filter(.[[dist_colname]] < dist_cutoff & .[[dist_colname]] >= dist_lower_cutoff)
+  
+  message(paste0("Selecting ", length(genes_select), " genes"))
+  message(paste0("Selecting ", nrow(gene_data), " spots"))
+  
+  message()
+  
+  gene_cor <- setNames(lapply(genes_select, function(g){
+    cor_res <- cor.test(x = gene_data[[dist_colname]], y = gene_data[[g]])
+    cor_res <- cbind(cor_res$estimate, cor_res$p.value)
+    colnames(cor_res) <- c("cor", "pval")
+    rownames(cor_res) <- g
+    return(cor_res)
+  }), nm = genes_select)
+  
+  gene_cor_df <- do.call("rbind", gene_cor) %>% 
+    as.data.frame() %>% 
+    rownames_to_column(var = "gene") %>% 
+    as_tibble() %>%
+    filter(!is.na(cor)) %>% 
+    arrange(-cor)
+  gene_cor_df$pval_FDR <- p.adjust(gene_cor_df$pval, method = "BH")
+  gene_cor_df$sign_005 <- ifelse(gene_cor_df$pval < 0.05, TRUE, FALSE)
+  gene_cor_df$sign_001 <- ifelse(gene_cor_df$pval < 0.01, TRUE, FALSE)
+  gene_cor_df$sign_padj_005 <- ifelse(gene_cor_df$pval_FDR < 0.05, TRUE, FALSE)
+  gene_cor_df$sign_padj_001 <- ifelse(gene_cor_df$pval_FDR < 0.01, TRUE, FALSE)
+  
+  return(gene_cor_df)
+}
+```
+
+```{r fig.width=18, fig.height=6}
+# VlnPlot(se_ipf_filt, features = sel_genes, group.by = "annotation2", pt.size = 0, ncol = 8)
+```
+
+```{r}
+max_dist <- 500 
+res_gene_cor <- RunGeneDistanceCor(se_ipf_filt, 
+                                   dist_colname = "r_dist_fibrotic", 
+                                   dist_cutoff = max_dist, 
+                                   genes_select = gs2)
+```
+
+```{r}
+res_gene_cor
+```
+
+```{r}
+write.csv(res_gene_cor, 
+          file.path(DIR_RES, "hs_DEA_fibrosis_distance_shared_up_DEG_expression_cor500um.csv"),
+          row.names = F
+          )
+```
+
+Select most negatively correlated genes
+
+```{r}
+sel_genes1 <- res_gene_cor |> 
+  filter(cor < 0, sign_padj_005 == TRUE) |> 
+  arrange(cor) |> 
+  pull(gene)
+sel_genes1
+```
+
+Select most positively correlated genes
+
+```{r}
+sel_genes2 <- res_gene_cor |> 
+  filter(cor > 0, sign_padj_005 == TRUE) |> 
+  arrange(desc(cor)) |>
+  pull(gene)
+sel_genes2
+```
+
+### **Visualize expression trends for selected DEGs**
+
+Define shared plot features
+
+```{r}
+custom_plot_theme <-   
+  theme_bw() +
+  theme(
+    aspect.ratio = 1,
+    panel.grid = element_blank(),
+    strip.background = element_blank(),
+    strip.text = element_text(size=10, color="black", hjust = 0.5),
+    text = element_text(size=10, color="black"), 
+    axis.text = element_text(size=10, color="black"), 
+    plot.title = element_text(size=10, color="black", face = "bold", hjust = 0.5))
+```
+
+Plot all genes with significantly negative correlation
+
+```{r}
+sel_genes <- sel_genes1
+p_data <- se_ipf_filt[[]] |> 
+  bind_cols(FetchData(se_ipf_filt, vars = sel_genes, slot = "data")) |> 
+  filter(r_dist_fibrotic < 2e3, r_dist_fibrotic > -1e3) |> 
+  pivot_longer(all_of(sel_genes), names_to = "variable", values_to = "value")
+```
+
+```{r fig.width=10, fig.height=8}
+p1 <- ggplot(p_data, aes(r_dist_fibrotic, value)) +
+  annotate("rect", xmin=-Inf, xmax=0, ymin=-Inf, ymax=Inf, alpha=0.2, fill="#D6604D") +
+  annotate("rect", xmin=0, xmax=Inf, ymin=-Inf, ymax=Inf, alpha=0.2, fill="#2166AC") +
+  geom_hline(yintercept = 0, linewidth=0.5, color="black") +
+  geom_smooth(method = "gam", formula = y ~ s(x, bs = "cs"), color="black") +
+  facet_wrap(~variable, nrow = 4, scales = "free") + #
+  labs(x="Distance from fibrosis (µm)", y="Expression", 
+        title="Expression along distance from fibrosis in IPF lungs") +
+  theme_bw() +
+  theme(
+    #panel.grid = element_blank(),
+    strip.background = element_blank(),
+    strip.text = element_text(size=10, color="black", hjust = 0.5),
+    text = element_text(size=10, color="black"), 
+    axis.text = element_text(size=10, color="black"), 
+    plot.title = element_text(size=10, color="black", face = "bold", hjust = 0.5));p1
+```
+
+```{r}
+pdf(file = file.path(DIR_RES, "hs_DEA_fibrosis_distance_shared_up_DEG_expression_gam_negcor500um.pdf"), 
+    width = 10, height = 8)
+p1
+dev.off()
+```
+
+Plot all genes with significantly positive correlation
+
+```{r}
+sel_genes <- sel_genes2
+p_data <- se_ipf_filt[[]] |> 
+  bind_cols(FetchData(se_ipf_filt, vars = sel_genes, slot = "data")) |> 
+  filter(r_dist_fibrotic < 2e3, r_dist_fibrotic > -1e3) |> 
+  pivot_longer(all_of(sel_genes), names_to = "variable", values_to = "value")
+```
+
+```{r fig.width=10, fig.height=8}
+p2 <- ggplot(p_data, aes(r_dist_fibrotic, value)) +
+  annotate("rect", xmin=-Inf, xmax=0, ymin=-Inf, ymax=Inf, alpha=0.2, fill="#D6604D") +
+  annotate("rect", xmin=0, xmax=Inf, ymin=-Inf, ymax=Inf, alpha=0.2, fill="#2166AC") +
+  geom_hline(yintercept = 0, linewidth=0.5, color="black") +
+  geom_smooth(method = "gam", formula = y ~ s(x, bs = "cs"), color="black") +
+  facet_wrap(~variable, nrow = 4, scales = "free") + #
+  labs(x="Distance from fibrosis (µm)", y="Expression", 
+        title="Expression along distance from fibrosis in IPF lungs") +
+  theme_bw() +
+  theme(
+    #panel.grid = element_blank(),
+    strip.background = element_blank(),
+    strip.text = element_text(size=10, color="black", hjust = 0.5),
+    text = element_text(size=10, color="black"), 
+    axis.text = element_text(size=10, color="black"), 
+    plot.title = element_text(size=10, color="black", face = "bold", hjust = 0.5));p2
+```
+
+```{r}
+pdf(file = file.path(DIR_RES, "hs_DEA_fibrosis_distance_shared_up_DEG_expression_gam_poscor500um.pdf"), 
+    width = 20, height = 8)
+p2
+dev.off()
+```
+
+#### Ext Data Figure plots
+
+Plot top 10 genes with significantly negative correlation
+
+```{r}
+sel_genes <- sel_genes1 |> head(n=10)
+p_data <- se_ipf_filt[[]] |> 
+  bind_cols(FetchData(se_ipf_filt, vars = sel_genes, slot = "data")) |> 
+  filter(r_dist_fibrotic < 1e3, r_dist_fibrotic > -1e3) |> 
+  pivot_longer(all_of(sel_genes), names_to = "variable", values_to = "value")
+```
+
+```{r}
+p_data |> 
+  group_by(variable) |> 
+  filter(value>0) |> 
+  summarize(
+    mean_expr = mean(value),
+    max_expr = max(value),
+    min_expr = min(value))
+```
+
+```{r fig.width=6, fig.height=4}
+p_negcor <- ggplot(p_data, aes(r_dist_fibrotic, value)) +
+  annotate("rect", xmin=-Inf, xmax=0, ymin=-Inf, ymax=Inf, alpha=0.3, fill="#492a63") +
+  annotate("rect", xmin=0, xmax=Inf, ymin=-Inf, ymax=Inf, alpha=0.3, fill="#7bc3e3") +
+  geom_vline(xintercept = 0, linewidth=0.25, color="#5DA6C6", linetype="dashed") +
+  geom_hline(yintercept = 0, linewidth=0.5, color="black") +
+  geom_smooth(method = "gam", formula = y ~ s(x, bs = "cs"), color="black") +
+  facet_wrap(~variable, nrow = 2, scales = "free_y") + 
+  labs(x="Distance from fibrosis (µm)", y="Norm. expression", 
+      title="Negatively correlated genes") +
+  scale_x_continuous(expand = c(0, 0)) +
+  custom_plot_theme +
+  theme(axis.text.x = element_text(angle=45, hjust=1));p_negcor
+```
+
+Plot top 10 genes with significantly positive correlation
+
+```{r}
+sel_genes <- sel_genes2 |> head(n=10)
+p_data <- se_ipf_filt[[]] |> 
+  bind_cols(FetchData(se_ipf_filt, vars = sel_genes, slot = "data")) |> 
+  filter(r_dist_fibrotic < 1e3, r_dist_fibrotic > -1e3) |> 
+  pivot_longer(all_of(sel_genes), names_to = "variable", values_to = "value")
+```
+
+```{r fig.width=6, fig.height=4}
+p_poscor <- ggplot(p_data, aes(r_dist_fibrotic, value)) +
+  annotate("rect", xmin=-Inf, xmax=0, ymin=-Inf, ymax=Inf, alpha=0.3, fill="#492a63") +
+  annotate("rect", xmin=0, xmax=Inf, ymin=-Inf, ymax=Inf, alpha=0.3, fill="#7bc3e3") +
+  geom_vline(xintercept = 0, linewidth=0.25, color="#5DA6C6", linetype="dashed") +
+  geom_hline(yintercept = 0, linewidth=0.5, color="black") +
+  geom_smooth(method = "gam", formula = y ~ s(x, bs = "cs"), color="black") +
+  facet_wrap(~variable, nrow = 2, scales = "free_y") + 
+  labs(x="Distance from fibrosis (µm)", y="Norm. expression", 
+      title="Positively correlated genes") +
+  scale_x_continuous(expand = c(0, 0)) +
+  custom_plot_theme +
+  theme(axis.text.x = element_text(angle=45, hjust=1));p_poscor
+
+```
+
+Save plots
+
+```{r fig.width=6, fig.height=6}
+pdf(file = file.path(DIR_RES, "hs_DEA_fibrosis_distance_shared_up_DEG_expression_gam_top10_500um.pdf"), 
+    width = 6, height = 6)
+p_negcor / p_poscor
+dev.off()
+```
+
+Plot cell densities
+
+```{r}
+sel_cells <- c("c2l_Myofibroblasts", "c2l_Fibroblasts", "c2l_Monocytes", "c2l_Macrophages",
+               "c2l_AT2", "c2l_AT1")
+p_data <- se_ipf_filt[[]] |> 
+  filter(r_dist_fibrotic < 1e3, r_dist_fibrotic > -1e3) |> 
+  pivot_longer(all_of(sel_cells), names_to = "variable", values_to = "value")
+
+p_data$variable <- factor(gsub("c2l_", "", p_data$variable), levels = gsub("c2l_", "", sel_cells))
+```
+
+```{r fig.width=3, fig.height=8}
+p_cell <- ggplot(p_data, aes(r_dist_fibrotic, value)) +
+  annotate("rect", xmin=-Inf, xmax=0, ymin=-Inf, ymax=Inf, alpha=0.3, fill="#492a63") +
+  annotate("rect", xmin=0, xmax=Inf, ymin=-Inf, ymax=Inf, alpha=0.3, fill="#7bc3e3") +
+  geom_vline(xintercept = 0, linewidth=0.25, color="#5DA6C6", linetype="dashed") +
+  geom_hline(yintercept = 0, linewidth=0.5, color="black") +
+  geom_smooth(method = "gam", formula = y ~ s(x, bs = "cs"), color="black") +
+  facet_wrap(~variable, nrow = 6, scales = "free_y") + 
+  labs(x="Distance from fibrosis (µm)", y="Inferred cell densities", 
+      title="Cell type densities") +
+  scale_x_continuous(expand = c(0, 0)) +
+  custom_plot_theme +
+  theme(axis.text.x = element_text(angle=45, hjust=1));p_cell
+```
+
+```{r}
+pdf(file = file.path(DIR_RES, "hs_DEA_fibrosis_distance_gam_cell_densities.pdf"), 
+    width = 3, height = 8)
+p_cell
+dev.off()
+```
+
+Spatial
+
+```{r}
+MapFeatures(se_ipf_filt, features = "POSTN", label_by = "sample_name",
+            ncol = 4, 
+            colors = rev(col_scale_spec), scale = "free")
+```

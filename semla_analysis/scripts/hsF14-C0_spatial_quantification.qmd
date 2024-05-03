@@ -1,0 +1,1229 @@
+---
+title: "F14-C0 spatial quantification - human"
+format: html
+editor: visual
+---
+
+## Intro
+
+Describe spatial localization of the human F14-C0 cluster and its relationship to annotated areas of fibroblastic foci (FF) or fbrosis.
+
+Specifically,
+
+-   F14-C0 located at edges of FF? Comparing with F14-C1-4?
+
+```{r}
+library(semla)
+library(dplyr)
+library(patchwork)
+library(RColorBrewer)
+library(tibble)
+library(tidyr)
+```
+
+```{r}
+color_10_d3 <- ggsci::pal_d3("category10")(10)
+color_10_set3 <- RColorBrewer::brewer.pal(10, "Set3")
+
+color_10_gradient <- hcl.colors(n = 10, palette = "Zissou 1", rev = T)
+color_10_gradient <- hcl.colors(n = 10, palette = "Set2")
+color_10_gradient <- RColorBrewer::brewer.pal(12, "Set3")
+
+col_scale_earth <- hcl.colors(n = 10, palette = "Earth")
+col_scale_temps <- hcl.colors(n = 10, palette = "Temps", rev = T)
+col_scale_spec <- RColorBrewer::brewer.pal(9, "Spectral")
+
+DIR_DATA <- file.path(getwd(), "..", "data")
+DIR_RES <- file.path(getwd(), "..", "results")
+```
+
+## Load and prepare Visium data
+
+```{r include=FALSE}
+se_stu <- readRDS(file = file.path(DIR_DATA, "hs_visium_preproc_A_se_obj.rds"))
+img_paths <- se_stu@tools$Staffli@imgs
+img_paths_new <- gsub(x = img_paths,
+                      pattern = "/home/st-analysis_home/lovisa.franzen/analysis/lung/spatial-lung-fibrosis/data/human/visium",
+                      replacement = "~/Documents/PhD_Lung/AZ_Human_Lung/210330_Visium/data/novaseq_210429/spaceranger_out"
+                      )
+
+se_stu@tools$Staffli@imgs <- img_paths_new
+```
+
+Add metadata
+
+```{r include=FALSE}
+mdata <- readRDS(file = file.path(DIR_DATA, "hs_visium_preproc_A_se_full_metadata.rds"))
+# mdata |> glimpse()
+colnames_include <- grep(pattern = "^factor|^f14|^d_|^c2l_", x = colnames(mdata), value = T)
+
+se_stu <- AddMetaData(se_stu, metadata = mdata[,colnames_include])
+
+```
+
+```{r include=FALSE}
+se_stu$bcs_stutility <- rownames(se_stu[[]])
+se <- UpdateSTUtilityV1Object(se_stu)
+
+rm(se_stu) # remove STUtility object
+```
+
+Save semla object
+
+```{r include=FALSE}
+saveRDS(se, file.path(DIR_DATA, 'hs_visium_preproc_A_se_full_metadata_semla.rds'))
+```
+
+```{r echo=FALSE}
+se <- readRDS(file.path(DIR_DATA, 'hs_visium_preproc_A_se_full_metadata_semla.rds'))
+```
+
+Subset data to include the annotated IPF sections
+
+```{r}
+se_ipf <- SubsetSTData(se, condition == "IPF")
+se_ipf <- SubsetSTData(se_ipf, annotation != "NA")
+```
+
+### Add FF annotations
+
+```{r}
+ff_anno_mdat <- file.path(DIR_DATA, "hs_visium_histopath_anno_FF_merged.csv")
+```
+
+```{r}
+se_ipf <- AddMetaData(se_ipf, ff_anno_mdat |> select(annotation_FF))
+se_ipf$annotation_FF <- ifelse(is.na(se_ipf$annotation_FF), "other", se_ipf$annotation_FF)
+```
+
+## FF and diseased tissue distances
+
+Look at F14-C0 distances from areas annotated as fibroblastic focus ("FF")
+
+```{r}
+se_ipf$annotation |> unique()
+se_ipf$annotation_FF |> unique()
+```
+
+### Proportions of F14-C0-4 within fibrotic tissues
+
+```{r}
+f14hi_summary <- se_ipf@meta.data 
+f14hi_summary$annotation <- ifelse(f14hi_summary$annotation == "Diseased", "fibrotic",
+                                    ifelse(f14hi_summary$annotation == "Suspect Fibrosis", "FF", 
+                                           "other")
+                                    )
+
+f14hi_summary$f14_subclusters <- ifelse(f14hi_summary$f14_subclusters != "other",
+                                        paste0("C", f14hi_summary$f14_subclusters),
+                                        f14hi_summary$f14_subclusters)
+
+f14hi_summary <- f14hi_summary |> 
+  group_by(f14_subclusters, annotation) |> 
+  summarise(n_spots = n())
+
+total_add <- f14hi_summary |> 
+  group_by(f14_subclusters) |> 
+  summarise(total_spots = sum(n_spots))
+
+f14hi_summary <- merge(f14hi_summary, total_add, by = "f14_subclusters")
+f14hi_summary$freq <- f14hi_summary$n_spots / f14hi_summary$total_spots
+
+f14hi_summary
+```
+
+Plot
+
+```{r}
+cols_anno <- setNames(c("grey", "#E391BA", "#8D71A6"), n = c("other", "FF", "fibrotic"))
+
+p1 <- ggplot(f14hi_summary, aes(x = reorder(f14_subclusters, desc(f14_subclusters)), y = freq, fill = annotation)) +
+  geom_col(position="stack", stat="identity", width=0.8) +
+  scale_fill_manual(values = cols_anno) +
+  labs(x="", y="frequency", fill = "", title = "Cluster frequency per annotated region") +
+  coord_flip() +
+  theme_bw() +
+  theme(text = element_text(size=14, color="black"), 
+        panel.grid = element_blank(), 
+        aspect.ratio = 1, 
+        title = element_text(size=10, color="black"));p1
+```
+
+### Proportions of annotated fibrotic tissue for each F14-C0-4 cluster
+
+```{r}
+f14hi_summary2 <- se_ipf@meta.data 
+f14hi_summary2$annotation <- ifelse(f14hi_summary2$annotation == "Diseased", "fibrotic",
+                                    ifelse(f14hi_summary2$annotation == "Suspect Fibrosis", "FF", 
+                                           "other")
+                                    )
+
+f14hi_summary2$f14_subclusters <- ifelse(f14hi_summary2$f14_subclusters != "other",
+                                        paste0("C", f14hi_summary2$f14_subclusters),
+                                        f14hi_summary2$f14_subclusters)
+
+f14hi_summary2 <- subset(f14hi_summary2, f14_subclusters != "other")
+
+f14hi_summary2 <- f14hi_summary2 |> 
+  group_by(annotation, f14_subclusters) |> 
+  summarise(n_spots = n())
+
+total_add <- f14hi_summary2 |> 
+  group_by(annotation) |> 
+  summarise(total_spots = sum(n_spots))
+
+f14hi_summary2 <- merge(f14hi_summary2, total_add, by = "annotation")
+f14hi_summary2$freq <- f14hi_summary2$n_spots / f14hi_summary2$total_spots
+
+f14hi_summary2
+```
+
+```{r}
+cols_clust <- setNames(c("#BC80BD", "#FBB4AE", "#B3CDE3", "#CCEBC5", "#FDDAEC", "grey"),  # RColorBrewer::brewer.pal(10, "Set3")
+                       nm = f14hi_summary$f14_subclusters |> unique())
+
+# "#FBB4AE" "#B3CDE3" "#CCEBC5" "#DECBE4" "#FED9A6" "#FFFFCC" "#E5D8BD" "#FDDAEC" "#F2F2F2""#BC80BD"
+ 
+p2 <- ggplot(f14hi_summary2, aes(x = reorder(annotation, desc(annotation)), y = freq, fill = reorder(f14_subclusters, desc(f14_subclusters)))) +
+  geom_col(position="stack", stat="identity", width=0.8) +
+  scale_fill_manual(values = cols_clust) +
+  labs(x="", y="frequency", fill = "", title = "Annotated spot frequency per cluster") +
+  coord_flip() +
+  theme_bw() +
+  theme(text = element_text(size=14, color="black"), 
+        panel.grid = element_blank(), 
+        aspect.ratio = 1, 
+        title = element_text(size=10, color="black"));p2
+```
+
+```{r fig.width=10, fig.height=4}
+p_out <- (p1 | p2) + 
+  patchwork::plot_annotation(caption = "Data from annotated IPF tissue sections only.")
+p_out
+```
+
+```{r}
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_proportions.pdf"), width = 10, height = 4)
+p_out
+dev.off()
+```
+
+### Proportions of F14-C0-4 within FF
+
+```{r}
+f14hi_summary3 <- se_ipf@meta.data 
+f14hi_summary3$f14_subclusters <- ifelse(f14hi_summary3$f14_subclusters != "other",
+                                        paste0("C", f14hi_summary3$f14_subclusters),
+                                        f14hi_summary3$f14_subclusters)
+
+f14hi_summary3 <- f14hi_summary3 |> 
+  group_by(f14_subclusters, annotation_FF) |> 
+  summarise(n_spots = n())
+
+total_add <- f14hi_summary3 |> 
+  group_by(f14_subclusters) |> 
+  summarise(total_spots = sum(n_spots))
+
+f14hi_summary3 <- merge(f14hi_summary3, total_add, by = "f14_subclusters")
+f14hi_summary3$freq <- f14hi_summary3$n_spots / f14hi_summary3$total_spots
+
+f14hi_summary3
+```
+
+```{r}
+cols_anno <- setNames(c("grey", "#E391BA", "#8D71A6"), n = c("other", "FF", "fibrotic"))
+
+p3 <- ggplot(f14hi_summary3, aes(x = reorder(f14_subclusters, desc(f14_subclusters)), y = freq, fill = annotation_FF)) +
+  geom_col(position="stack", stat="identity", width=0.8) +
+  scale_fill_manual(values = cols_anno) +
+  labs(x="", y="frequency", fill = "", title = "Cluster frequency per annotated region") +
+  coord_flip() +
+  theme_bw() +
+  theme(text = element_text(size=14, color="black"), 
+        panel.grid = element_blank(), 
+        aspect.ratio = 1, 
+        title = element_text(size=10, color="black"));p3
+```
+
+### F14-C0 distances to FF borders
+
+skip - Prepare input
+
+```{r}
+# se_ipf$annotation2 <- ifelse(se_ipf$annotation == "Diseased", "fibrotic",
+#                              ifelse(se_ipf$annotation == "Suspect Fibrosis", "FF", 
+#                                     "other")
+#                              )
+```
+
+Extract radial distances
+
+```{r}
+se_ipf <- RadialDistance(se_ipf, 
+                         remove_singletons = F,
+                         column_name = "annotation_FF", 
+                         selected_groups = "FF",
+                         convert_to_microns = T)
+```
+
+```{r}
+rdist_data <- se_ipf@meta.data
+
+rdist_data <- rdist_data |> filter(!is.na(r_dist_FF))
+rdist_data$f14_subclusters2 <- ifelse(rdist_data$f14_subclusters != "other",
+                                        paste0("C", rdist_data$f14_subclusters),
+                                        rdist_data$f14_subclusters)
+
+rdist_data$r_dist_FF |> max()
+rdist_data$r_dist_FF |> min()
+rdist_data$sample_name |> unique()
+rdist_data$sample_name |> unique() |> length()
+```
+
+**Group data into bins**
+
+Filter data to exclude "other" cluster
+
+```{r}
+rdist_data_filt <- rdist_data |> select(sample_name, f14_subclusters2, r_dist_FF) |> filter(f14_subclusters2 != "other")
+```
+
+Decide bin size
+
+```{r}
+min(rdist_data_filt$r_dist_FF)
+max(rdist_data_filt$r_dist_FF)
+
+bin_breaks <- seq(-250, 6350, 100)
+```
+
+Split into bins and compute summarizing stats
+
+```{r}
+# Cut into bins
+rdist_data_filt$dist_bin <- cut(rdist_data_filt$r_dist_FF, bin_breaks, 
+                                labels = bin_breaks[-length(bin_breaks)]+50)
+
+rdist_data_filt$dist_bin <- rdist_data_filt$dist_bin |> as.character() |> as.numeric()
+
+# rdist_data_filt$dist_bin <- ifelse(rdist_data_filt$dist_bin >= 4e3, 4e3, rdist_data_filt$dist_bin)  # Cut-off for distances ≥4000 µm
+
+# Format bin IDs to be centered
+rdist_data_filt$dist_bin_min <- rdist_data_filt$dist_bin - 50
+rdist_data_filt$dist_bin_max <- rdist_data_filt$dist_bin + 50
+
+head(rdist_data_filt)
+
+# Compute summarizing stats
+rdist_data_filt_stats <- rdist_data_filt |> 
+  group_by(f14_subclusters2, dist_bin) |> 
+  summarize(n_per_bin = n())
+rdist_data_filt_stats |> arrange(f14_subclusters2, dist_bin)
+```
+
+Perform second filter to remove very high distance bins
+
+```{r}
+max_cutoff <- 3000
+rdist_data_filt <- rdist_data_filt |> filter(dist_bin <= 3000)
+```
+
+skip - Perform third "filter" to group together data from spots of \< -300 µm (often times missing in sections)
+
+```{r}
+# min_cutoff <- -300 (all data has >=-300 bins)
+# rdist_data_filt |> filter(dist_bin >= min_cutoff)
+```
+
+Initial plots
+
+```{r}
+ggplot(rdist_data_filt, aes(x=f14_subclusters2, y = r_dist_FF)) +
+  geom_violin()
+```
+
+```{r}
+# ggplot(rdist_data_filt, aes(x=r_dist_FF)) +
+#   geom_vline(xintercept = 0, linwidth=0.5, color="orange") +
+#   geom_histogram(binwidth = 40) +
+#   xlim(-350, 2e3) +
+#   facet_wrap(~f14_subclusters2) +
+#   theme_bw()
+```
+
+```{r fig.width=10, fig.height=3}
+pdat <- rdist_data_filt_stats
+pdat$dist_bin <- pdat$dist_bin |> as.character() |> as.numeric()
+
+ggplot(pdat, aes(x=dist_bin, y=n_per_bin)) +
+  geom_vline(xintercept = 0, linwidth=0.5, color="orange") +
+  geom_col() +
+  facet_wrap(~f14_subclusters2, ncol = 5)
+```
+
+### Distance enrichment analysis
+
+Compute enrichment scores vs a random distribution of spot positions along the distance axis (z-score).
+
+#### **1. Randomize iteration 100x**
+
+**Method 1 (M1):** Randomize clusters directly into the binned data --- **Do not use**
+
+```{r message=FALSE, include=FALSE}
+bin_breaks_obs <- unique(rdist_data_filt$dist_bin) |> sort()
+k <- 100
+res_list <- lapply(1:k, function(i){
+  #print(i)
+  set.seed(i)
+  rand_res <- rdist_data_filt |> 
+    group_by(f14_subclusters2) |> 
+    mutate(rand_dist_bin = sample(x = bin_breaks_obs, size = n(), replace = T))
+  rand_res_out <- rand_res |> 
+    group_by(f14_subclusters2, rand_dist_bin) |> 
+    summarise(n = n())
+  rand_res_out$cluster_bin <- paste0(rand_res_out$f14_subclusters2, "_", rand_res_out$rand_dist_bin)
+  rand_res_out$rand_iter <- stringr::str_pad(i, 3, pad = "0")
+  rand_res_out <- rename(rand_res_out, all_of(c(cluster = "f14_subclusters2", bin = "rand_dist_bin")))
+  return(rand_res_out)
+  })
+```
+
+```{r include=FALSE}
+res_df <- bind_rows(res_list) |> 
+  mutate(rand_iter = paste0("n_r", rand_iter)) |> 
+  pivot_wider(names_from = rand_iter, values_from = n)
+```
+
+**Method 2 (M2):** Randomize clusters for each sample before binning and summarizing data --- **Use this**
+
+```{r message=FALSE, warning=FALSE}
+#' 1. Use 'rdist_data' for metadata to create randomization of f14 cluster spots
+#' 2. Filter the data (same as 'rdist_data_filt')
+#' 3. Bin data. Same breaks as before: bin_breaks <- seq(-450, 2750, 100)
+#' 4. Summarize results from each bin (same as for observed values)
+#' 5. Repeat steps 1-4 k times
+#' 6. Bind results
+i <- 1
+k <- 100
+
+res_list <- lapply(1:k, function(i){
+  print(i)
+  set.seed(i)
+  #' Step 1: randomization
+  rdist_data_rand <- rdist_data |> 
+    group_by(sample_name) |> 
+    mutate(f14_clust_rand = sample(f14_subclusters2))
+  
+  #' Step 2: Filter
+  rdist_data_filt_rand <- rdist_data_rand |> select(sample_name, f14_clust_rand, r_dist_FF) |> filter(f14_clust_rand != "other")
+  
+  #' Step 3: Bin
+  # Cut into bins
+  rdist_data_filt_rand$dist_bin <- cut(rdist_data_filt_rand$r_dist_FF, bin_breaks, labels = bin_breaks[-length(bin_breaks)]+50)
+  rdist_data_filt_rand$dist_bin <- rdist_data_filt_rand$dist_bin |> as.character() |> as.numeric()
+  
+  # Format bin IDs to be centered
+  rdist_data_filt_rand$dist_bin_min <- rdist_data_filt_rand$dist_bin - 50
+  rdist_data_filt_rand$dist_bin_max <- rdist_data_filt_rand$dist_bin + 50
+  
+  #' Step 3.2: Second fiter
+  # max_cutoff <- 2000
+  rdist_data_filt_rand <- rdist_data_filt_rand |> filter(dist_bin <= max_cutoff)
+  
+  #' Step 4: summarize
+  rand_res_out <- rdist_data_filt_rand |> 
+      group_by(f14_clust_rand, dist_bin) |> 
+      summarise(n = n())
+  rand_res_out$cluster_bin <- paste0(rand_res_out$f14_clust_rand, "_", rand_res_out$dist_bin)
+  rand_res_out$rand_iter <- stringr::str_pad(i, 3, pad = "0")
+  rand_res_out <- rename(rand_res_out, all_of(c(cluster = "f14_clust_rand", bin = "dist_bin")))
+  
+  return(rand_res_out)
+  })
+```
+
+```{r}
+res_df <- bind_rows(res_list) |> 
+  mutate(rand_iter = paste0("n_r", rand_iter)) |> 
+  pivot_wider(names_from = rand_iter, values_from = n)
+
+res_df
+```
+
+#### **2. Observed values**
+
+```{r}
+res_obs <- rdist_data_filt |> 
+  group_by(f14_subclusters2, dist_bin) |> 
+  summarise(n_obs = n())
+
+res_obs <- rename(res_obs, all_of(c(cluster = "f14_subclusters2", bin = "dist_bin")))
+res_obs$cluster_bin <- paste0(res_obs$cluster, "_", res_obs$bin)
+```
+
+Format output table
+
+```{r}
+res_df_rand <- select(res_df, contains("n_r"))[,-1] |> mutate_if(is.integer, ~replace(., is.na(.), 0))
+r_avg <- apply(X = res_df_rand, MARGIN = 1, FUN = mean)
+r_sd <- apply(X = res_df_rand, MARGIN = 1, FUN = sd)
+
+res_df_final <- res_df |> select(cluster, bin, cluster_bin)
+res_df_final$n_rand_avg <- r_avg
+res_df_final$n_rand_sd <- r_sd
+
+res_df_final <- merge(res_df_final, res_obs[,c("cluster_bin", "n_obs")], by = "cluster_bin", all = T)
+
+res_df_final <- res_df_final |> arrange(cluster, bin)
+```
+
+```{r}
+res_df_final$n_obs[is.na(res_df_final$n_obs)] <- 0
+```
+
+#### 3. Compute statistics
+
+**Compute z-score**
+
+```{r}
+res_df_final$n_zscore <- (res_df_final$n_obs - res_df_final$n_rand_avg) / res_df_final$n_rand_sd
+```
+
+**Compute p-value**
+
+```{r}
+res_df_final$p_val <- 2*pnorm(q=abs(res_df_final$n_zscore), lower.tail=FALSE)
+res_df_final$sign <- ifelse(res_df_final$p_val<0.05, TRUE, FALSE)
+res_df_final$sign001 <- ifelse(res_df_final$p_val<0.001, TRUE, FALSE)
+```
+
+Plot random distribution
+
+```{r}
+ggplot(res_df_final, aes(x=n_rand_avg)) +
+  geom_histogram() +
+  facet_grid(~cluster, scales="free")
+```
+
+```{r}
+res_df_final |> head()
+```
+
+**Save output table**
+
+```{r}
+write.csv(res_df_final, 
+          file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_bin_zscore_M2.csv"), 
+          row.names = F)
+```
+
+#### 4. Visualize **results**
+
+```{r fig.width=6*2, fig.height=1.5*2}
+# col_breaks <- c(-0.00001, -0.001, 0.05, 1)
+pdat <- res_df_final
+p_zscore <- ggplot(pdat, aes(x=bin, y=n_zscore)) +
+  geom_hline(yintercept = 0, linewidth=0.5, color="black") +
+  annotate("rect", xmin=-Inf, xmax=0, ymin=-Inf, ymax=Inf, alpha=0.2, fill="orange") +
+  geom_vline(xintercept = 0, linewidth=0.5, color="orange") +
+  geom_col(fill="grey80", width = 100) +
+  geom_col(data = subset(pdat, sign==TRUE),
+           mapping = aes(x=bin, y=n_zscore), fill="#9EDAE5FF", width = 100) +
+  geom_col(data = subset(pdat, sign001==TRUE),
+           mapping = aes(x=bin, y=n_zscore), fill="#215189", width = 100) +
+  labs(x="distance bins (100 µm)", y = "z-score (n spots)", title = "Enrichment of clusters at a distance from FF (distance 0: FF border)") +
+  facet_wrap(~cluster, ncol = 5) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=45, hjust=1, size=10, color="black"),
+        axis.text.y = element_text(size=10, color="black"),
+        panel.grid = element_blank(),
+        text = element_text(size=10, color="black"));p_zscore
+```
+
+Plot with upper cap limit
+
+```{r fig.width=6*2, fig.height=1.5*2}
+pdat <- res_df_final
+pdat_filt <- pdat |> subset(bin <= 1000)
+
+p_zscore2 <- ggplot(pdat_filt, aes(x=bin, y=n_zscore)) +
+  geom_hline(yintercept = 0, linewidth=0.5, color="black") +
+  annotate("rect", xmin=-Inf, xmax=0, ymin=-Inf, ymax=Inf, alpha=0.2, fill="orange") +
+  # geom_vline(xintercept = -225, linewidth=12, color="orange", alpha=0.2) +
+  geom_vline(xintercept = 0, linewidth=0.5, color="orange") +
+  geom_col(fill="grey80", width = 100) +
+  geom_col(data = subset(pdat_filt, sign==TRUE),
+           mapping = aes(x=bin, y=n_zscore), fill="#9EDAE5FF", width = 100) +
+  geom_col(data = subset(pdat_filt, sign001==TRUE),
+           mapping = aes(x=bin, y=n_zscore), fill="#215189", width = 100) +
+  scale_x_continuous(breaks=seq(-200, 1400, 200)) +
+  labs(x="distance bins (100 µm)", y = "z-score (n spots)", title = "Enrichment of clusters at a distance from FF (distance 0: FF border)") +
+  facet_wrap(~cluster, ncol = 5) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=45, hjust=1, size=10, color="black"),
+        axis.text.y = element_text(size=10, color="black"),
+        panel.grid = element_blank(),
+        text = element_text(size=10, color="black"));p_zscore2
+
+```
+
+Plot with further zoom upper cap limit
+
+```{r fig.width=4*2, fig.height=1.5*2}
+pdat <- res_df_final
+pdat_filt <- pdat |> subset(bin <= 500 & bin >= -300)
+
+p_zscore3 <- ggplot(pdat_filt, aes(x=bin, y=n_zscore)) +
+  geom_hline(yintercept = 0, linewidth=0.5, color="black") +
+  annotate("rect", xmin=-Inf, xmax=0, ymin=-Inf, ymax=Inf, alpha=0.2, fill="orange") +
+  # geom_vline(xintercept = -225, linewidth=12, color="orange", alpha=0.2) +
+  geom_vline(xintercept = 0, linewidth=0.5, color="orange") +
+  geom_col(fill="grey80", width = 100) +
+  geom_col(data = subset(pdat_filt, sign==TRUE),
+           mapping = aes(x=bin, y=n_zscore), fill="#9EDAE5FF", width = 100) +
+  geom_col(data = subset(pdat_filt, sign001==TRUE),
+           mapping = aes(x=bin, y=n_zscore), fill="#215189", width = 100) +
+  scale_x_continuous(breaks=seq(-200, 1400, 200)) +
+  labs(x="distance bins (100 µm)", y = "z-score (n spots)", title = "Enrichment of clusters at a distance from FF (distance 0: FF border)") +
+  facet_wrap(~cluster, ncol = 5) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle=45, hjust=1, size=10, color="black"),
+        axis.text.y = element_text(size=10, color="black"),
+        aspect.ratio = 1,
+        panel.grid = element_blank(),
+        panel.grid.major.y = element_line(linewidth = 0.25, color = "grey80"),
+        text = element_text(size=10, color="black"));p_zscore3
+```
+
+Export plot
+
+```{r}
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_bin_zscore_M2.pdf"), width = 11, height = 9)
+(p_zscore / p_zscore2 / (p_zscore3 + plot_spacer() + plot_layout(widths = c(2,1)))) + 
+  patchwork::plot_annotation(caption = "Light blue: p < 0.05; Dark blue: p < 0.01; Grey: n.s.")
+dev.off()
+```
+
+### Plot H&E overlay
+
+Selected tissue samples:
+
+-   IPF_3 B1
+
+-   IPF_3 B3
+
+-   IPF_4 B3
+
+-   IPF_1
+
+```{r}
+cols_clust2 <- cols_clust
+names(cols_clust2) <- c(as.character(0:4), "other")
+cols_clust2[1] <- "#301934"
+```
+
+```{r}
+se_ipf$sample_name |> unique()
+```
+
+```{r fig.width=12, fig.height=10}
+cols_annotation2 <- setNames(object = c("#5DA6C6",
+                                        "#215189",
+                                        "#E391BA",
+                                        "#EDC962",
+                                        "#AB4A3D",
+                                        "#8D71A6"),
+                                        nm = c("Normal Alveolar and Other",
+                                               "Large Airway",
+                                               "Blood Vessel",
+                                               "Diseased",
+                                               "Inflammation",
+                                               "Suspect Fibrosis"))
+MapLabels(se_ipf, column_name = "annotation", ncol = 4, 
+          label_by = "sample_name", colors = cols_annotation2) & theme(aspect.ratio = 1) & NoLegend()
+```
+
+#### 1: IPF 3, B1
+
+```{r}
+se_ipf_1 <- SubsetSTData(se_ipf, sample_name %in% "IPF_3.TD031.G1.2")
+se_ipf_1 <- LoadImages(se_ipf_1, image_height = 2e3)
+ImagePlot(se_ipf_1)
+```
+
+```{r}
+# se_ipf_1 <- FeatureViewer(se_ipf_1, selected_features = "r_dist_FF")
+```
+
+**Create bins**
+
+```{r}
+se_ipf_1$dist_bin <- cut(se_ipf_1$r_dist_FF, bin_breaks, labels = bin_breaks[-length(bin_breaks)]+50)
+```
+
+Plot
+
+```{r}
+MapFeatures(se_ipf_1, 
+            label_by = "sample_name",
+           features = c("r_dist_FF"), 
+           image_use = "raw",
+           color = c("black", col_scale_spec), 
+           pt_size = 1,
+           max_cutoff = 0.9,
+           pt_alpha = 0.8) &
+  theme(panel.grid.major = element_line(linetype = "dashed"), axis.text = element_text())
+```
+
+**Area 1**
+
+```{r fig.width=10, fig.height=6}
+crop_window1 <- c(0.1, 0.1, 0.43, 0.43)
+p1 <- MapFeatures(se_ipf_1, 
+                  label_by = "sample_name",
+                 features = c("r_dist_FF"), 
+                 image_use = "raw",
+                 color = c("black",col_scale_spec), 
+                 pt_size = 2.5,
+                 pt_stroke = 1,
+                 crop_area = crop_window1,
+                 max_cutoff = 0.2,
+                 pt_alpha = 0.8);p1
+
+p2 <- MapLabels(se_ipf_1, column_name = "f14_subclusters",
+                label_by = "sample_name",
+          image_use = "raw",
+          color = cols_clust2,
+          pt_size = 2.5,
+          pt_stroke = 1,
+          crop_area = crop_window1,
+          max_cutoff = 0.2,
+          pt_alpha = 0.8)
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_cluster_spatial_FF_IPF3_B1-1.pdf"), width = 12, height = 6)
+p1 | p2
+dev.off()
+```
+
+```{r fig.width=6, fig.height=6}
+cols_scale <- hcl.colors(n = 12, palette = "spectral", rev = F)
+p_bins <- MapLabels(se_ipf_1, 
+                    label_by = "sample_name",
+                    column_name = "dist_bin",
+                    image_use = "raw",
+                    color = c(cols_scale[1], "black", cols_scale[2:12], rep("#584B9F", 4*12)),
+                    pt_size = 3,
+                    crop_area = crop_window1, #c(0.1, 0.1, 0.43, 0.43),
+                    max_cutoff = 0.2,
+                    pt_alpha = 0.8);p_bins
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_bins_spatial_FF_IPF3_B1-1.pdf"), width = 6, height = 6)
+p_bins
+dev.off()
+```
+
+**Area 2**
+
+```{r fig.width=10, fig.height=6}
+crop_window2 <- c(0.25, 0.35, 0.55, 0.65)
+p1 <- MapFeatures(se_ipf_1, 
+                  label_by = "sample_name",
+                 features = c("r_dist_FF"), 
+                 image_use = "raw",
+                 color = c("black",col_scale_spec), 
+                 pt_size = 2,
+                 pt_stroke = 1,
+                 crop_area = crop_window2,
+                 max_cutoff = 0.2,
+                 pt_alpha = 0.8);p1
+
+p2 <- MapLabels(se_ipf_1, 
+                label_by = "sample_name",
+                column_name = "f14_subclusters",
+                image_use = "raw",
+                color = cols_clust2,
+                pt_size = 2,
+                pt_stroke = 1,
+                crop_area = crop_window2,
+                max_cutoff = 0.2,
+                pt_alpha = 0.8)
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_cluster_spatial_FF_IPF3_B1-2.pdf"), width = 12, height = 6)
+p1 | p2
+dev.off()
+```
+
+```{r fig.width=6, fig.height=6}
+cols_scale <- hcl.colors(n = 12, palette = "spectral", rev = F)
+p_bins <- MapLabels(se_ipf_1, 
+                    column_name = "dist_bin",
+                    label_by = "sample_name",
+                    image_use = "raw",
+                    color = c(cols_scale[1], "black", cols_scale[2:12], rep("#584B9F", 4*12)),
+                    pt_size = 3,
+                    crop_area = crop_window2,
+                    max_cutoff = 0.2,
+                    pt_alpha = 0.8);p_bins
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_bins_spatial_FF_IPF3_B1-2.pdf"), width = 6, height = 6)
+p_bins
+dev.off()
+```
+
+#### 2: IPF 3, B3
+
+```{r}
+se_ipf_2 <- SubsetSTData(se_ipf, sample_name %in% "IPF_3.TD032B.G3.2")
+se_ipf_2 <- LoadImages(se_ipf_2, image_height = 2e3)
+ImagePlot(se_ipf_2)
+```
+
+**Create bins**
+
+```{r}
+se_ipf_2$dist_bin <- cut(se_ipf_2$r_dist_FF, bin_breaks, labels = bin_breaks[-length(bin_breaks)]+50)
+```
+
+Plot
+
+```{r}
+MapFeatures(se_ipf_2, 
+            label_by = "sample_name",
+           features = c("r_dist_FF"), 
+           image_use = "raw",
+           color = c("black", col_scale_spec), 
+           pt_size = 1,
+           max_cutoff = 0.8,
+           pt_alpha = 0.8) &
+  theme(panel.grid.major = element_line(linetype = "dashed"), axis.text = element_text())
+```
+
+Arera 1: c(0.2, 0.3, 0.4, 0.5) \# c(0.25, 0.35, 0.45, 0.55)
+
+**Area 1**
+
+```{r fig.width=10, fig.height=6}
+crop_window1 <- c(0.2, 0.3, 0.4, 0.5)
+p1 <- MapFeatures(se_ipf_2, 
+                  label_by = "sample_name",
+                 features = c("r_dist_FF"), 
+                 image_use = "raw",
+                 color = c("black",col_scale_spec), 
+                 pt_size = 2.5,
+                 pt_stroke = 1,
+                 crop_area = crop_window1,
+                 max_cutoff = 0.2,
+                 pt_alpha = 0.8);p1
+
+p2 <- MapLabels(se_ipf_2, column_name = "f14_subclusters",
+          label_by = "sample_name",
+          image_use = "raw",
+          color = cols_clust2,
+          pt_size = 2.5,
+          pt_stroke = 1,
+          crop_area = crop_window1,
+          max_cutoff = 0.2,
+          pt_alpha = 0.8)
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_cluster_spatial_FF_IPF3_B3-1.pdf"), width = 12, height = 6)
+p1 | p2
+dev.off()
+```
+
+```{r fig.width=6, fig.height=6}
+cols_scale <- hcl.colors(n = 12, palette = "spectral", rev = F)
+p_bins <- MapLabels(se_ipf_2, 
+                    label_by = "sample_name",
+                    column_name = "dist_bin",
+                    image_use = "raw",
+                    color = c(cols_scale[1], "black", cols_scale[2:12], rep("#584B9F", 4*12)),
+                    pt_size = 3.5,
+                    crop_area = crop_window1,
+                    max_cutoff = 0.2,
+                    pt_alpha = 0.8);p_bins
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_bins_spatial_FF_IPF3_B3-1.pdf"), width = 6, height = 6)
+p_bins
+dev.off()
+```
+
+**Area 2**
+
+```{r fig.width=10, fig.height=6}
+crop_window2 <- c(0.2, 0.6, 0.4, 0.8)
+p1 <- MapFeatures(se_ipf_2, 
+                  label_by = "sample_name",
+                 features = c("r_dist_FF"), 
+                 image_use = "raw",
+                 color = c("black",col_scale_spec), 
+                 pt_size = 3,
+                 pt_stroke = 1,
+                 crop_area = crop_window2,
+                 max_cutoff = 0.2,
+                 pt_alpha = 0.8);p1
+
+p2 <- MapLabels(se_ipf_2, column_name = "f14_subclusters",
+                label_by = "sample_name",
+          image_use = "raw",
+          color = cols_clust2,
+          pt_size = 3,
+          pt_stroke = 1,
+          crop_area = crop_window2,
+          max_cutoff = 0.2,
+          pt_alpha = 0.8)
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_cluster_spatial_FF_IPF3_B3-2.pdf"), width = 12, height = 6)
+p1 | p2
+dev.off()
+```
+
+```{r}
+MapLabels(se_ipf_2, 
+          label_by = "sample_name",
+          column_name = "annotation_FF",
+          colors = cols_anno,
+          pt_stroke = 0.5,
+          image_use = "raw",
+          pt_size = 4,
+          crop_area = crop_window2,
+          max_cutoff = 0.2,
+          pt_alpha = 0.8)
+```
+
+```{r}
+cols_scale <- hcl.colors(n = 12, palette = "spectral", rev = F)
+p_bins <- MapLabels(se_ipf_2, 
+                    label_by = "sample_name",
+                    column_name = "dist_bin",
+                    image_use = "raw",
+                    color = c(cols_scale[1], "black", cols_scale[2:12], rep("#584B9F", 4*12)),
+                    pt_size = 4,
+                    crop_area = crop_window2,
+                    max_cutoff = 0.2,
+                    pt_alpha = 0.8);p_bins
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_bins_spatial_FF_IPF3_B3-2.pdf"), width = 6, height = 6)
+p_bins
+dev.off()
+```
+
+#### 3: IPF 4, B3
+
+IPF_4.TD042.G3.1
+
+```{r}
+se_ipf_3 <- SubsetSTData(se_ipf, sample_name %in% "IPF_4.TD042.G3.1")
+se_ipf_3 <- LoadImages(se_ipf_3, image_height = 1937)
+ImagePlot(se_ipf_3)
+```
+
+**Create bins**
+
+```{r}
+se_ipf_3$dist_bin <- cut(se_ipf_3$r_dist_FF, bin_breaks, labels = bin_breaks[-length(bin_breaks)]+50)
+```
+
+Plot
+
+```{r}
+MapFeatures(se_ipf_3, 
+            label_by = "sample_name",
+           features = c("r_dist_FF"), 
+           image_use = "raw",
+           color = c("black", col_scale_spec), 
+           pt_size = 1,
+           max_cutoff = 0.8,
+           pt_alpha = 0.8) &
+  theme(panel.grid.major = element_line(linetype = "dashed"), axis.text = element_text())
+```
+
+**Area 1**
+
+```{r fig.width=10, fig.height=6}
+crop_window1 <- c(0.2, 0.1, 0.4, 0.3)
+p1 <- MapFeatures(se_ipf_3, 
+                 label_by = "sample_name",
+                 features = c("r_dist_FF"), 
+                 image_use = "raw",
+                 color = c("black",col_scale_spec), 
+                 pt_size = 2,
+                 pt_stroke = 1,
+                 crop_area = crop_window1,
+                 max_cutoff = 0.2,
+                 pt_alpha = 0.8);p1
+
+p2 <- MapLabels(se_ipf_3, column_name = "f14_subclusters",
+          label_by = "sample_name",
+          image_use = "raw",
+          color = cols_clust2,
+          pt_size = 2,
+          pt_stroke = 1,
+          crop_area = crop_window1,
+          max_cutoff = 0.2,
+          pt_alpha = 0.8)
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_cluster_spatial_FF_IPF4_B3-1.pdf"), width = 12, height = 6)
+p1 | p2
+dev.off()
+```
+
+```{r fig.width=6, fig.height=6}
+cols_scale <- hcl.colors(n = 12, palette = "spectral", rev = F)
+p_bins <- MapLabels(se_ipf_3, 
+                    label_by = "sample_name",
+                    column_name = "dist_bin",
+                    image_use = "raw",
+                    color = c(cols_scale[1], "black", cols_scale[2:12], rep("#584B9F", 4*12)),
+                    pt_size = 3.5,
+                    crop_area = crop_window1,
+                    max_cutoff = 0.2,
+                    pt_alpha = 0.8);p_bins
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_bins_spatial_FF_IPF4_B3-1.pdf"), width = 6, height = 6)
+p_bins
+dev.off()
+```
+
+**Area 2**
+
+```{r fig.width=10, fig.height=6}
+crop_window2 <- c(0.55, 0.55, 0.75, 0.75)
+p1 <- MapFeatures(se_ipf_3, 
+                  label_by = "sample_name",
+                 features = c("r_dist_FF"), 
+                 image_use = "raw",
+                 color = c("black",col_scale_spec), 
+                 pt_size = 3,
+                 pt_stroke = 1,
+                 crop_area = crop_window2,
+                 max_cutoff = 0.2,
+                 pt_alpha = 0.8);p1
+
+p2 <- MapLabels(se_ipf_3, column_name = "f14_subclusters",
+          label_by = "sample_name",
+          image_use = "raw",
+          color = cols_clust2,
+          pt_size = 3,
+          pt_stroke = 1,
+          crop_area = crop_window2,
+          max_cutoff = 0.2,
+          pt_alpha = 0.8)
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_cluster_spatial_FF_IPF4_B3-2.pdf"), width = 12, height = 6)
+p1 | p2
+dev.off()
+```
+
+```{r}
+MapLabels(se_ipf_3, 
+          label_by = "sample_name",
+          column_name = "annotation_FF",
+          colors = cols_anno,
+          pt_stroke = 0.5,
+          image_use = "raw",
+          pt_size = 4,
+          crop_area = crop_window2,
+          max_cutoff = 0.2,
+          pt_alpha = 0.8)
+```
+
+Plot bins
+
+```{r}
+cols_scale <- hcl.colors(n = 12, palette = "spectral", rev = F)
+p_bins <- MapLabels(se_ipf_3, 
+                    label_by = "sample_name",
+                    column_name = "dist_bin",
+                    image_use = "raw",
+                    color = c(cols_scale[1], "black", cols_scale[2:12], rep("#584B9F", 4*12)),
+                    pt_size = 4,
+                    crop_area = crop_window2,
+                    max_cutoff = 0.2,
+                    pt_alpha = 0.8);p_bins
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_bins_spatial_FF_IPF4_B3-2.pdf"), width = 6, height = 6)
+p_bins
+dev.off()
+```
+
+#### 4: IPF 1, B2
+
+IPF_1.TD012.G2.1
+
+```{r}
+se_ipf_4 <- SubsetSTData(se_ipf, sample_name %in% "IPF_1.TD012.G2.1")
+se_ipf_4 <- LoadImages(se_ipf_4, image_height = 1937)
+ImagePlot(se_ipf_4)
+```
+
+**Create bins**
+
+```{r}
+se_ipf_4$dist_bin <- cut(se_ipf_4$r_dist_FF, bin_breaks, labels = bin_breaks[-length(bin_breaks)]+50)
+```
+
+Plot
+
+```{r}
+MapFeatures(se_ipf_4, 
+            label_by = "sample_name",
+           features = c("r_dist_FF"), 
+           image_use = "raw",
+           color = c("black", col_scale_spec), 
+           pt_size = 1,
+           max_cutoff = 0.8,
+           pt_alpha = 0.8) &
+  theme(panel.grid.major = element_line(linetype = "dashed"), axis.text = element_text())
+```
+
+**Area 1**
+
+```{r fig.width=10, fig.height=6}
+crop_window1 <- c(0.4, 0.2, 0.6, 0.4)
+p1 <- MapFeatures(se_ipf_4, 
+                  label_by = "sample_name",
+                 features = c("r_dist_FF"), 
+                 image_use = "raw",
+                 color = c("black",col_scale_spec), 
+                 pt_size = 2,
+                 pt_stroke = 1,
+                 crop_area = crop_window1,
+                 max_cutoff = 0.2,
+                 pt_alpha = 0.8);p1
+
+p2 <- MapLabels(se_ipf_4, column_name = "f14_subclusters",
+          label_by = "sample_name",
+          image_use = "raw",
+          color = cols_clust2,
+          pt_size = 2,
+          pt_stroke = 1,
+          crop_area = crop_window1,
+          max_cutoff = 0.2,
+          pt_alpha = 0.8)
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_cluster_spatial_FF_IPF1_B2-1.pdf"), width = 12, height = 6)
+p1 | p2
+dev.off()
+```
+
+```{r fig.width=6, fig.height=6}
+cols_scale <- hcl.colors(n = 12, palette = "spectral", rev = F)
+p_bins <- MapLabels(se_ipf_4, 
+                    label_by = "sample_name",
+                    column_name = "dist_bin",
+                    image_use = "raw",
+                    color = c(cols_scale[1], "black", cols_scale[2:12], rep("#584B9F", 4*12)),
+                    pt_size = 3.5,
+                    crop_area = crop_window1,
+                    max_cutoff = 0.2,
+                    pt_alpha = 0.8);p_bins
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_bins_spatial_FF_IPF1_B2-1.pdf"), width = 6, height = 6)
+p_bins
+dev.off()
+```
+
+**Area 2**
+
+```{r fig.width=10, fig.height=6}
+crop_window2 <- c(0.1, 0.5, 0.5, 0.9)
+p1 <- MapFeatures(se_ipf_4, 
+                  label_by = "sample_name",
+                 features = c("r_dist_FF"), 
+                 image_use = "raw",
+                 color = c("black",col_scale_spec), 
+                 pt_size = 2,
+                 pt_stroke = .5,
+                 crop_area = crop_window2,
+                 max_cutoff = 0.2,
+                 pt_alpha = 0.8);p1
+
+p2 <- MapLabels(se_ipf_4, column_name = "f14_subclusters",
+          label_by = "sample_name",
+          image_use = "raw",
+          color = cols_clust2,
+          pt_size = 2,
+          pt_stroke = .5,
+          crop_area = crop_window2,
+          max_cutoff = 0.2,
+          pt_alpha = 0.8)
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_cluster_spatial_FF_IPF1_B2-2.pdf"), width = 12, height = 6)
+p1 | p2
+dev.off()
+```
+
+```{r}
+MapLabels(se_ipf_4, 
+          label_by = "sample_name",
+          column_name = "annotation_FF",
+          colors = cols_anno,
+          pt_stroke = 0.5,
+          image_use = "raw",
+          pt_size = 2,
+          crop_area = crop_window2,
+          max_cutoff = 0.2,
+          pt_alpha = 0.8)
+```
+
+Plot bins
+
+```{r}
+cols_scale <- hcl.colors(n = 12, palette = "spectral", rev = F)
+p_bins <- MapLabels(se_ipf_4, 
+                    label_by = "sample_name",
+                    column_name = "dist_bin",
+                    image_use = "raw",
+                    color = c(cols_scale[1], "black", cols_scale[2:12], rep("#584B9F", 4*12)),
+                    pt_size = 2.5,
+                    crop_area = crop_window2,
+                    max_cutoff = 0.2,
+                    pt_alpha = 0.8);p_bins
+
+pdf(file = file.path(DIR_RES, "f14-c0", "hs_F14_subcluster_distance_bins_spatial_FF_IPF1_B2-2.pdf"), width = 6, height = 6)
+p_bins
+dev.off()
+```
+
+
+## Wrap-up
+
+```{r}
+sessionInfo()
+```
+
+```{r}
+# save.image(file=file.path(DIR_RES, "f14-c0", 'hsF14-C0_workspace_image_2024-02-22.RData'))
+
+```
+
+
+```{r}
+se_ipf$sample_name |> unique()
+```
+
+```{r}
+se_ipf_5 <- SubsetSTData(se_ipf, sample_name %in% "IPF_1.TD013.G3.1")
+se_ipf_5 <- LoadImages(se_ipf_5, image_height = 1e3)
+```
+
+```{r fig.width=8, fig.height=5}
+f_plot <- "factor_5"
+MapFeatures(se_ipf_5, features = f_plot, image_use = "raw", label_by = "sample_name",
+            scale_alpha = T, colors = viridis::viridis(10), max_cutoff = .99) | 
+  MapFeatures(se_ipf_5, features = f_plot, image_use = "raw", label_by = "sample_name",
+              scale_alpha = F, colors = viridis::viridis(10))
+```
+
+```{r}
+se_ipf_6 <- SubsetSTData(se_ipf, sample_name %in% "IPF_2.TD022.G3.2")
+se_ipf_6 <- LoadImages(se_ipf_6, image_height = 1e3)
+```
+```{r fig.width=6, fig.height=14}
+f_plot <- c("factor_5", "factor_21", "factor_2")
+MapFeatures(se_ipf_6, features = f_plot, image_use = "raw", label_by = "sample_name",
+            scale_alpha = T, colors = viridis::viridis(10), max_cutoff = .99, ncol = 1) | 
+  MapFeatures(se_ipf_6, features = f_plot, image_use = "raw", label_by = "sample_name",
+              scale_alpha = F, colors = viridis::viridis(10), ncol = 1)
+```
+

@@ -1,0 +1,77 @@
+---
+title: "Visualizations of hsNMF results"
+format: html
+editor: visual
+---
+
+## Intro
+
+Spatial visualizations of selected factors for Supplementary Figures.
+
+```{r}
+library(semla)
+library(dplyr)
+library(patchwork)
+library(RColorBrewer)
+library(tibble)
+library(tidyr)
+```
+
+### Define params
+
+```{r}
+color_10_d3 <- ggsci::pal_d3("category10")(10)
+color_10_set3 <- RColorBrewer::brewer.pal(10, "Set3")
+
+color_10_gradient <- hcl.colors(n = 10, palette = "Zissou 1", rev = T)
+color_10_gradient <- hcl.colors(n = 10, palette = "Set2")
+color_10_gradient <- RColorBrewer::brewer.pal(12, "Set3")
+
+col_scale_earth <- hcl.colors(n = 10, palette = "Earth")
+col_scale_temps <- hcl.colors(n = 10, palette = "Temps", rev = T)
+col_scale_spec <- RColorBrewer::brewer.pal(9, "Spectral")
+col_scale_viridis <- viridis::viridis(10)
+```
+
+```{r}
+DIR_DATA <- file.path(getwd(), "..", "data")
+DIR_RES <- file.path(getwd(), "..", "results")
+DIR_FIG <- file.path(DIR_RES, "nmf_visualization")
+```
+
+### Load data
+
+```{r}
+se <- readRDS(file.path(DIR_DATA, 'hs_visium_preproc_A_se_full_metadata_semla.rds'))
+```
+
+```{r}
+se_ipf <- SubsetSTData(se, condition == "IPF")
+```
+
+## Visualize NMF
+
+### Honeycombing -- F2, F5, F21
+
+```{r}
+samples_select <- c("IPF_1.TD013.G3.1", "IPF_2.TD022.G3.2") 
+f_plot <- c("factor_5", "factor_21", "factor_2")
+```
+
+```{r}
+se_ipf_hc <- SubsetSTData(se_ipf, sample_name %in% samples_select)
+se_ipf_hc <- LoadImages(se_ipf_hc, image_height = 1e3)
+```
+
+```{r fig.width=12, fig.height=10}
+p_hc <- MapFeatures(se_ipf_hc, features = f_plot, image_use = "raw", label_by = "sample_name",
+              scale_alpha = F, colors = viridis::viridis(10), ncol = 1, pt_size = 1);p_hc
+```
+
+```{r}
+pdf(file = file.path(DIR_FIG, "hsNMF_F2_F5_F21_honeycombing.pdf"), width = 12, height = 10)
+p_hc
+dev.off()
+```
+
+### 
