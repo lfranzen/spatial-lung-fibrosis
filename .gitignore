@@ -2,7 +2,8 @@
 /zenodo*
 /data/*/
 /results/*/
-/doc/*/
+/doc/hide/
+/scripts/hide*
 .Rhistory
 .Rproj.user/
 Rprofile
