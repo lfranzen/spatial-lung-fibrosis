@@ -3,3 +3,6 @@
 /data/*/
 /results/*/
 /doc/*/
+.Rhistory
+.Rproj.user/
+Rprofile
