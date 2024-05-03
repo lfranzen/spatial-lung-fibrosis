@@ -26,7 +26,7 @@ The data processing workflows have been illustrated [here](https://github.com/lf
 
 ## Content
 
-* `bin/`: Installation files for R packages `devtools`, `STUtility`, and `NNLM`  
+* `bin/`: Installation files for R packages `NNLM`  
 * `data/`: Follow instructions in the `README.txt` file placed within this folder to download and populate these folders with the relevant input data  
   * `human/`  
     * `visium/` 
@@ -39,7 +39,7 @@ The data processing workflows have been illustrated [here](https://github.com/lf
 * `results/`: Directory for saving analysis output objects and figures  
 * `doc/`: Contains schematic workflow overview for the analyses   
 * `semla_analysis/`: All files used for analyses performed using *semla*    
-  * `bin/`: Installation files for R packages `spatstat`, `STUtility`, and `NNLM`  
+  * `bin/`: Installation files for R packages `spatstat` and `NNLM`  
   * `data/`: Visium object metadata used for input in semla analyses, together with Visium Seurat objects (needs to be downloaded separately)  
   * `scripts/`: All scripts used for analyzing the Visium data with *semla*
 
@@ -51,7 +51,7 @@ If you intend to replicate some of the analyses presented here, it is recommende
 1. Move the `semla_analysis` folder and content to another location (this analysis path has its own R project file and package requirements)  
 2. Download the spaceranger output data and/or STUtility/Seurat objects and place them in their correct locations (see `data/README.txt`)  
 3. Install [`renv`](https://rstudio.github.io/renv/articles/renv.html) and install the necessary packages from the `renv.lock` file by using `renv::restore()`
-4. Manually install the packages within the `bin/` folder  
+4. Manually install the packages within the `bin/` folder(s) and [STUtility v. 1.1.1](https://github.com/jbergenstrahle/STUtility/releases/tag/1.1.1)  
 5. Read the `scripts/README.txt` for information about all scripts and their content
 
 
