@@ -1,6 +1,8 @@
 /hide*
 /zenodo*
-/data/*/
+/data/hide*/
+/data/human
+/data/mouse
 /results/*/
 /doc/hide/
 /scripts/hide*
