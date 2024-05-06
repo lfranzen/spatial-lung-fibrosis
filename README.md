@@ -55,6 +55,13 @@ If you intend to replicate some of the analyses presented here, it is recommende
 5. Read the `scripts/README.txt` for information about all scripts and their content
 
 
+For details on the analysis steps, please see the overview schematic flowcharts below:
+
+<p align="center"><img src="/doc/analysis_workflow_schematic_Hs.png" width=400"></p>
+
+<p align="center"><img src="/doc/analysis_workflow_schematic_Mm.png" width=400"></p>
+
+
 ## Contact
 
 For questions related to this repo and its content, please contact Lovisa Franzén (lovisa.franzen@scilifelab.se)
