@@ -1,3 +1,6 @@
+[![DOI](https://zenodo.org/badge/525827467.svg)](https://zenodo.org/doi/10.5281/zenodo.11193764) [![](https://badgen.net/static/bioRxiv/10.1101%2023.12.21.572330/red?.svg)](https://www.biorxiv.org/content/10.1101/2023.12.21.572330v1) 
+
+
 # *Mapping spatially resolved transcriptomes in human and mouse pulmonary fibrosis*
 
 Lovisa Franzén<sup>§</sup>, Martina Olsson Lindvall<sup>§</sup>, Michael Hühn, Victoria Ptasinski, Laura Setyo, Benjamin P Keith, Astrid Collin, Steven Oag, Thomas Volckaert, Annika Borde, Joakim Lundeberg, Julia Lindgren, Graham Belfield, Sonya Jackson, Anna Ollerstam, Marianna Stamou<sup>$</sup>, Patrik L Ståhl<sup>$</sup>, Jorrit J Hornberg
