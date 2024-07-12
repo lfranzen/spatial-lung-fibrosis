@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/525827467.svg)](https://zenodo.org/doi/10.5281/zenodo.11193764) [![](https://badgen.net/static/bioRxiv/10.1101%2023.12.21.572330/red?.svg)](https://www.biorxiv.org/content/10.1101/2023.12.21.572330v1) 
+[![DOI](https://zenodo.org/badge/525827467.svg)](https://zenodo.org/doi/10.5281/zenodo.11193764) [![](https://badgen.net/static/bioRxiv/10.1101%2023.12.21.572330/red?.svg)](https://www.biorxiv.org/content/10.1101/2023.12.21.572330v1) [![](https://badgen.net/static/Publication/10.1038.s41588-024-01819-2/green?.svg)](https://www.nature.com/articles/s41588-024-01819-2) 
 
 
 # *Mapping spatially resolved transcriptomes in human and mouse pulmonary fibrosis*
@@ -7,6 +7,8 @@ Lovisa Franzén<sup>§</sup>, Martina Olsson Lindvall<sup>§</sup>, Michael Hüh
 
 § These authors contributed equally to the work  
 $ Corresponding authors
+
+Nature Genetics (2024). DOI: 10.1038/s41588-024-01819-2
 
 *bioRxiv* DOI:[https://doi.org/10.1101/2023.12.21.572330]
 
